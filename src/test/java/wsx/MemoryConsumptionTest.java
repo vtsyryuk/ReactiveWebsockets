@@ -21,27 +21,19 @@ public final class MemoryConsumptionTest {
     private SocketEndpoint clientToDataServer;
     private SocketEndpoint browserServer;
 
-    private ReplyMessageService textMessageService;
-
-    private SubscriptionRouter router;
-    private Observer<DiagnosticMessage> diagnosticPublisher;
-    private Scheduler scheduler;
-
     private RequestMessageHandler browserHandler1;
     private ReplyMessageHandler dataServerHandler;
 
     private Session browserSession1;
     private Session dataServerSession;
-    private Async dataServerEndpoint;
-    private Async browserEndpoint1;
 
     @Before
     public void setUp() {
-        scheduler = Schedulers.immediate();
-        diagnosticPublisher = new DiagnosticMessageService().getPublisher();
-        textMessageService = new ReplyMessageService();
+        Scheduler scheduler = Schedulers.immediate();
+        Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
+        ReplyMessageService textMessageService = new ReplyMessageService();
 
-        router = new SubscriptionRouter(textMessageService.getStream());
+        SubscriptionRouter router = new SubscriptionRouter(textMessageService.getStream());
 
         RequestMessageHandlerFactory requestMessageHandlerFactory =
                 new RequestMessageHandlerFactory(router, diagnosticPublisher, scheduler);
@@ -51,19 +43,19 @@ public final class MemoryConsumptionTest {
                         router.getRequestStream(),
                         textMessageService.getPublisher(), diagnosticPublisher, scheduler);
 
-        SessionManager curvePublisherSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
+        SessionManager dataServerSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
         SessionManager browserSessionManager = new RequestStreamSessionManager(requestMessageHandlerFactory);
 
-        clientToDataServer = new SocketEndpoint(curvePublisherSessionManager, diagnosticPublisher);
+        clientToDataServer = new SocketEndpoint(dataServerSessionManager, diagnosticPublisher);
         browserServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
 
         browserSession1 = Mockito.mock(Session.class);
 
         dataServerSession = Mockito.mock(Session.class);
 
-        browserEndpoint1 = Mockito.mock(Async.class);
+        Async browserEndpoint1 = Mockito.mock(Async.class);
 
-        dataServerEndpoint = Mockito.mock(Async.class);
+        Async dataServerEndpoint = Mockito.mock(Async.class);
 
         Mockito.when(browserSession1.getAsyncRemote()).thenReturn(browserEndpoint1);
         Mockito.when(browserSession1.getId()).thenReturn("1");
