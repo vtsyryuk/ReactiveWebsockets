@@ -22,15 +22,11 @@ import java.util.List;
 @SuppressWarnings({"synthetic-access"})
 public final class HighLoadTest {
 
-    private SocketEndpoint skywebClient;
-    private SocketEndpoint skywebServer;
-    private ReplyMessageService textMessageService;
-    private SubscriptionRouter router;
-    private Observer<DiagnosticMessage> diagnosticPublisher;
-    private Scheduler scheduler;
-    private ReplyMessageHandler curvePublisherHandler;
-    private Session curvePublisherSession;
-    private Async curvePublisherEndpoint;
+    private SocketEndpoint clientToDataServer;
+    private SocketEndpoint browserServer;
+    private ReplyMessageHandler dataServerHandler;
+    private Session dataServerSession;
+    private Async dataServerEndpoint;
     private int browserCount;
     private List<BrowserSessionMock> browsers;
     private int textMsgCount;
@@ -38,16 +34,14 @@ public final class HighLoadTest {
     private List<ReplyMessage> confMessages;
     private List<RequestMessage> subMessages;
     private List<RequestMessage> unsubMessages;
-    private int subjectsPerBrowser;
-    private int iterationCount = 10;
 
     @Before
     public void setUp() {
-        scheduler = Schedulers.immediate();
-        diagnosticPublisher = new DiagnosticMessageService().getPublisher();
-        textMessageService = new ReplyMessageService();
+        Scheduler scheduler = Schedulers.immediate();
+        Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
+        ReplyMessageService textMessageService = new ReplyMessageService();
 
-        router = new SubscriptionRouter(textMessageService.getStream());
+        SubscriptionRouter router = new SubscriptionRouter(textMessageService.getStream());
 
         RequestMessageHandlerFactory requestMessageHandlerFactory =
                 new RequestMessageHandlerFactory(router, diagnosticPublisher, scheduler);
@@ -57,15 +51,15 @@ public final class HighLoadTest {
                         router.getRequestStream(),
                         textMessageService.getPublisher(), diagnosticPublisher, scheduler);
 
-        SessionManager curvePublisherSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
+        SessionManager dataServerSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
         SessionManager browserSessionManager = new RequestStreamSessionManager(requestMessageHandlerFactory);
 
-        skywebClient = new SocketEndpoint(curvePublisherSessionManager, diagnosticPublisher);
-        skywebServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
+        clientToDataServer = new SocketEndpoint(dataServerSessionManager, diagnosticPublisher);
+        browserServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
 
         browserCount = 100;
         browsers = new ArrayList<>(browserCount);
-        subjectsPerBrowser = 10;
+        int subjectsPerBrowser = 10;
 
         textMsgCount = 100;
         textMessages = new ArrayList<>(textMsgCount);
@@ -103,19 +97,19 @@ public final class HighLoadTest {
             browsers.add(b);
         }
 
-        curvePublisherSession = Mockito.mock(Session.class);
-        curvePublisherEndpoint = Mockito.mock(Async.class);
-        Mockito.when(curvePublisherSession.getAsyncRemote()).thenReturn(curvePublisherEndpoint);
-        Mockito.when(curvePublisherSession.getId()).thenReturn(String.valueOf(browserCount + 1));
+        dataServerSession = Mockito.mock(Session.class);
+        dataServerEndpoint = Mockito.mock(Async.class);
+        Mockito.when(dataServerSession.getAsyncRemote()).thenReturn(dataServerEndpoint);
+        Mockito.when(dataServerSession.getId()).thenReturn(String.valueOf(browserCount + 1));
 
         Mockito.doAnswer(new Answer<ReplyMessageHandler>() {
             @Override
             public ReplyMessageHandler answer(InvocationOnMock invocation) throws Throwable {
-                curvePublisherHandler = (ReplyMessageHandler) invocation.getArguments()[0];
+                dataServerHandler = (ReplyMessageHandler) invocation.getArguments()[0];
                 return null;
             }
         })
-                .when(curvePublisherSession)
+                .when(dataServerSession)
                 .addMessageHandler(Mockito.any(MessageHandler.class));
 
         for (int i = 0; i < textMsgCount; ++i) {
@@ -144,17 +138,17 @@ public final class HighLoadTest {
         }
 
         for (BrowserSessionMock m : browsers) {
-            skywebServer.onOpen(m.session, endpointConfig);
+            browserServer.onOpen(m.session, endpointConfig);
         }
 
-        curvePublisherHandler = null;
-        skywebClient.onOpen(curvePublisherSession, endpointConfig);
+        dataServerHandler = null;
+        clientToDataServer.onOpen(dataServerSession, endpointConfig);
 
         for (BrowserSessionMock m : browsers) {
             Assert.assertNotNull(m.handler);
         }
 
-        Assert.assertNotNull(curvePublisherHandler);
+        Assert.assertNotNull(dataServerHandler);
 
         // Subscribing each browser to a range of subjects
         for (BrowserSessionMock m : browsers) {
@@ -170,13 +164,13 @@ public final class HighLoadTest {
         }
 
         for (int i = 0; i < textMsgCount; i += textMsgCount / 10) {
-            Mockito.verify(curvePublisherEndpoint, Mockito.times(1))
+            Mockito.verify(dataServerEndpoint, Mockito.times(1))
                     .sendObject(Mockito.refEq(subMessages.get(i), "timestamp"), Mockito.any(SendHandler.class));
         }
 
         for (int i = 0; i < textMsgCount; ++i) {
             ReplyMessage msgConf = confMessages.get(i);
-            curvePublisherHandler.onMessage(msgConf);
+            dataServerHandler.onMessage(msgConf);
         }
 
         int messagesPerSubject = 5;
@@ -184,7 +178,7 @@ public final class HighLoadTest {
         for (int k = 0; k < messagesPerSubject; ++k) {
             for (int i = 0; i < textMsgCount; ++i) {
                 ReplyMessage msgText = textMessages.get(i);
-                curvePublisherHandler.onMessage(msgText);
+                dataServerHandler.onMessage(msgText);
             }
         }
 
@@ -221,7 +215,7 @@ public final class HighLoadTest {
         }
 
         for (int i = 0; i < textMsgCount; i += textMsgCount / 10) {
-            Mockito.verify(curvePublisherEndpoint, Mockito.never())
+            Mockito.verify(dataServerEndpoint, Mockito.never())
                     .sendObject(Mockito.refEq(unsubMessages.get(i)), Mockito.any(SendHandler.class));
         }
 
@@ -239,7 +233,7 @@ public final class HighLoadTest {
         }
 
         for (int i = 0; i < textMsgCount; i += textMsgCount / 10) {
-            Mockito.verify(curvePublisherEndpoint, Mockito.times(1))
+            Mockito.verify(dataServerEndpoint, Mockito.times(1))
                     .sendObject(Mockito.refEq(unsubMessages.get(i), "timestamp"), Mockito.any(SendHandler.class));
         }
     }
@@ -254,13 +248,14 @@ public final class HighLoadTest {
         }
 
         for (BrowserSessionMock m : browsers) {
-            skywebServer.onOpen(m.session, endpointConfig);
+            browserServer.onOpen(m.session, endpointConfig);
         }
 
-        curvePublisherHandler = null;
-        skywebClient.onOpen(curvePublisherSession, endpointConfig);
+        dataServerHandler = null;
+        clientToDataServer.onOpen(dataServerSession, endpointConfig);
 
 
+        int iterationCount = 10;
         for (int j = 0; j < iterationCount; ++j) {
             // Subscribing each browser to a range of subjects
             for (BrowserSessionMock m : browsers) {
@@ -277,7 +272,7 @@ public final class HighLoadTest {
 
             for (int i = 0; i < textMsgCount; ++i) {
                 ReplyMessage msgConf = confMessages.get(i);
-                curvePublisherHandler.onMessage(msgConf);
+                dataServerHandler.onMessage(msgConf);
             }
 
             int messagesPerSubject = 5;
@@ -285,7 +280,7 @@ public final class HighLoadTest {
             for (int k = 0; k < messagesPerSubject; ++k) {
                 for (int i = 0; i < textMsgCount; ++i) {
                     ReplyMessage msgText = textMessages.get(i);
-                    curvePublisherHandler.onMessage(msgText);
+                    dataServerHandler.onMessage(msgText);
                 }
             }
 

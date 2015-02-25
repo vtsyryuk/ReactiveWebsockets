@@ -1,7 +1,6 @@
 package wsx;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -17,6 +16,8 @@ import javax.websocket.Session;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.junit.Assert.*;
 
 public final class EndpointTest {
 
@@ -66,7 +67,7 @@ public final class EndpointTest {
             Mockito.when(manager.attach(session1)).thenReturn(Subscriptions.empty());
 
             endpoint.onError(session1, new Exception("TestError1"));
-            Assert.assertEquals(1, diagnosticMessages.size());
+            assertEquals(1, diagnosticMessages.size());
         }
     }
 
@@ -89,13 +90,13 @@ public final class EndpointTest {
             endpoint.onClose(session1, closeReason);
 
             // we haven't opened the session yet
-            Assert.assertFalse(sessionClosed[0]);
+            assertFalse(sessionClosed[0]);
 
             EndpointConfig config = Mockito.mock(EndpointConfig.class);
             endpoint.onOpen(session1, config);
             endpoint.onClose(session1, closeReason);
 
-            Assert.assertTrue(sessionClosed[0]);
+            assertTrue(sessionClosed[0]);
         }
     }
 }

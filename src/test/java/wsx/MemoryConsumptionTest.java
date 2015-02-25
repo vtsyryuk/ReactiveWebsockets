@@ -18,8 +18,8 @@ import javax.websocket.Session;
 @SuppressWarnings({"synthetic-access"})
 public final class MemoryConsumptionTest {
 
-    private SocketEndpoint skywebClient;
-    private SocketEndpoint skywebServer;
+    private SocketEndpoint clientToDataServer;
+    private SocketEndpoint browserServer;
 
     private ReplyMessageService textMessageService;
 
@@ -28,12 +28,12 @@ public final class MemoryConsumptionTest {
     private Scheduler scheduler;
 
     private RequestMessageHandler browserHandler1;
-    private ReplyMessageHandler curvePublisherHandler;
+    private ReplyMessageHandler dataServerHandler;
 
     private Session browserSession1;
-    private Session curvePublisherSession;
+    private Session dataServerSession;
+    private Async dataServerEndpoint;
     private Async browserEndpoint1;
-    private Async curvePublisherEndpoint;
 
     @Before
     public void setUp() {
@@ -54,22 +54,22 @@ public final class MemoryConsumptionTest {
         SessionManager curvePublisherSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
         SessionManager browserSessionManager = new RequestStreamSessionManager(requestMessageHandlerFactory);
 
-        skywebClient = new SocketEndpoint(curvePublisherSessionManager, diagnosticPublisher);
-        skywebServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
+        clientToDataServer = new SocketEndpoint(curvePublisherSessionManager, diagnosticPublisher);
+        browserServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
 
         browserSession1 = Mockito.mock(Session.class);
 
-        curvePublisherSession = Mockito.mock(Session.class);
+        dataServerSession = Mockito.mock(Session.class);
 
         browserEndpoint1 = Mockito.mock(Async.class);
 
-        curvePublisherEndpoint = Mockito.mock(Async.class);
+        dataServerEndpoint = Mockito.mock(Async.class);
 
         Mockito.when(browserSession1.getAsyncRemote()).thenReturn(browserEndpoint1);
         Mockito.when(browserSession1.getId()).thenReturn("1");
 
-        Mockito.when(curvePublisherSession.getAsyncRemote()).thenReturn(curvePublisherEndpoint);
-        Mockito.when(curvePublisherSession.getId()).thenReturn("3");
+        Mockito.when(dataServerSession.getAsyncRemote()).thenReturn(dataServerEndpoint);
+        Mockito.when(dataServerSession.getId()).thenReturn("3");
 
         Mockito.doAnswer(new Answer<RequestMessageHandler>() {
             @Override
@@ -85,11 +85,11 @@ public final class MemoryConsumptionTest {
         Mockito.doAnswer(new Answer<ReplyMessageHandler>() {
             @Override
             public ReplyMessageHandler answer(InvocationOnMock invocation) throws Throwable {
-                curvePublisherHandler = (ReplyMessageHandler) invocation.getArguments()[0];
+                dataServerHandler = (ReplyMessageHandler) invocation.getArguments()[0];
                 return null;
             }
         })
-                .when(curvePublisherSession)
+                .when(dataServerSession)
                 .addMessageHandler(Mockito.any(MessageHandler.class));
     }
 
@@ -100,13 +100,13 @@ public final class MemoryConsumptionTest {
 
         browserHandler1 = null;
 
-        skywebServer.onOpen(browserSession1, endpointConfig);
+        browserServer.onOpen(browserSession1, endpointConfig);
 
-        curvePublisherHandler = null;
-        skywebClient.onOpen(curvePublisherSession, endpointConfig);
+        dataServerHandler = null;
+        clientToDataServer.onOpen(dataServerSession, endpointConfig);
 
         Assert.assertNotNull(browserHandler1);
-        Assert.assertNotNull(curvePublisherHandler);
+        Assert.assertNotNull(dataServerHandler);
 
         RequestMessage msgSub = new RequestMessage();
         MessageSubject subject = MessageSubjectFactory.create("Subject", "Subject1");
@@ -122,8 +122,8 @@ public final class MemoryConsumptionTest {
 
         for (int i = 0; i < 10000; ++i) {
             browserHandler1.onMessage(msgSub);
-            curvePublisherHandler.onMessage(msgConf);
-            curvePublisherHandler.onMessage(msgText);
+            dataServerHandler.onMessage(msgConf);
+            dataServerHandler.onMessage(msgText);
             browserHandler1.onMessage(msgUnsub);
         }
     }
