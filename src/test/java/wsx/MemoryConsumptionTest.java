@@ -18,14 +18,14 @@ import javax.websocket.Session;
 @SuppressWarnings({"synthetic-access"})
 public final class MemoryConsumptionTest {
 
-    private SocketEndpoint clientToDataServer;
-    private SocketEndpoint browserServer;
+    private SocketEndpoint webappClient;
+    private SocketEndpoint webappServer;
 
     private RequestMessageHandler browserHandler1;
-    private ReplyMessageHandler dataServerHandler;
+    private ReplyMessageHandler webappHandler;
 
     private Session browserSession1;
-    private Session dataServerSession;
+    private Session webappSession;
 
     @Before
     public void setUp() {
@@ -43,15 +43,15 @@ public final class MemoryConsumptionTest {
                         router.getRequestStream(),
                         textMessageService.getPublisher(), diagnosticPublisher, scheduler);
 
-        SessionManager dataServerSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
+        SessionManager webappSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
         SessionManager browserSessionManager = new RequestStreamSessionManager(requestMessageHandlerFactory);
 
-        clientToDataServer = new SocketEndpoint(dataServerSessionManager, diagnosticPublisher);
-        browserServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
+        webappClient = new SocketEndpoint(webappSessionManager, diagnosticPublisher);
+        webappServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
 
         browserSession1 = Mockito.mock(Session.class);
 
-        dataServerSession = Mockito.mock(Session.class);
+        webappSession = Mockito.mock(Session.class);
 
         Async browserEndpoint1 = Mockito.mock(Async.class);
 
@@ -60,8 +60,8 @@ public final class MemoryConsumptionTest {
         Mockito.when(browserSession1.getAsyncRemote()).thenReturn(browserEndpoint1);
         Mockito.when(browserSession1.getId()).thenReturn("1");
 
-        Mockito.when(dataServerSession.getAsyncRemote()).thenReturn(dataServerEndpoint);
-        Mockito.when(dataServerSession.getId()).thenReturn("3");
+        Mockito.when(webappSession.getAsyncRemote()).thenReturn(dataServerEndpoint);
+        Mockito.when(webappSession.getId()).thenReturn("3");
 
         Mockito.doAnswer(new Answer<RequestMessageHandler>() {
             @Override
@@ -77,11 +77,11 @@ public final class MemoryConsumptionTest {
         Mockito.doAnswer(new Answer<ReplyMessageHandler>() {
             @Override
             public ReplyMessageHandler answer(InvocationOnMock invocation) throws Throwable {
-                dataServerHandler = (ReplyMessageHandler) invocation.getArguments()[0];
+                webappHandler = (ReplyMessageHandler) invocation.getArguments()[0];
                 return null;
             }
         })
-                .when(dataServerSession)
+                .when(webappSession)
                 .addMessageHandler(Mockito.any(MessageHandler.class));
     }
 
@@ -92,13 +92,13 @@ public final class MemoryConsumptionTest {
 
         browserHandler1 = null;
 
-        browserServer.onOpen(browserSession1, endpointConfig);
+        webappServer.onOpen(browserSession1, endpointConfig);
 
-        dataServerHandler = null;
-        clientToDataServer.onOpen(dataServerSession, endpointConfig);
+        webappHandler = null;
+        webappClient.onOpen(webappSession, endpointConfig);
 
         Assert.assertNotNull(browserHandler1);
-        Assert.assertNotNull(dataServerHandler);
+        Assert.assertNotNull(webappHandler);
 
         RequestMessage msgSub = new RequestMessage();
         MessageSubject subject = MessageSubjectFactory.create("Subject", "Subject1");
@@ -114,8 +114,8 @@ public final class MemoryConsumptionTest {
 
         for (int i = 0; i < 10000; ++i) {
             browserHandler1.onMessage(msgSub);
-            dataServerHandler.onMessage(msgConf);
-            dataServerHandler.onMessage(msgText);
+            webappHandler.onMessage(msgConf);
+            webappHandler.onMessage(msgText);
             browserHandler1.onMessage(msgUnsub);
         }
     }

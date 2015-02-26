@@ -19,17 +19,17 @@ import javax.websocket.Session;
 @SuppressWarnings({"synthetic-access"})
 public final class LocalClientServerTest {
 
-    private SocketEndpoint clientToDataServer;
-    private SocketEndpoint browserServer;
+    private SocketEndpoint webappClient;
+    private SocketEndpoint webappServer;
 
     private RequestMessageHandler browserHandler1;
     private RequestMessageHandler browserHandler2;
-    private ReplyMessageHandler dataServerHandler;
+    private ReplyMessageHandler webappHandler;
 
     private Session browserSession1;
     private Session browserSession2;
-    private Session dataServerSession;
-    private Async dataServerEndpoint;
+    private Session webappSession;
+    private Async webappEndpoint;
     private Async browserEndpoint1;
     private Async browserEndpoint2;
 
@@ -49,26 +49,26 @@ public final class LocalClientServerTest {
                         router.getRequestStream(),
                         textMessageService.getPublisher(), diagnosticPublisher, scheduler);
 
-        SessionManager dataServerSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
+        SessionManager webappSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
         SessionManager browserSessionManager = new RequestStreamSessionManager(requestMessageHandlerFactory);
 
-        clientToDataServer = new SocketEndpoint(dataServerSessionManager, diagnosticPublisher);
-        browserServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
+        webappClient = new SocketEndpoint(webappSessionManager, diagnosticPublisher);
+        webappServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
 
         browserSession1 = Mockito.mock(Session.class);
         browserSession2 = Mockito.mock(Session.class);
-        dataServerSession = Mockito.mock(Session.class);
+        webappSession = Mockito.mock(Session.class);
 
         browserEndpoint1 = Mockito.mock(Async.class);
         browserEndpoint2 = Mockito.mock(Async.class);
-        dataServerEndpoint = Mockito.mock(Async.class);
+        webappEndpoint = Mockito.mock(Async.class);
 
         Mockito.when(browserSession1.getAsyncRemote()).thenReturn(browserEndpoint1);
         Mockito.when(browserSession1.getId()).thenReturn("1");
         Mockito.when(browserSession2.getAsyncRemote()).thenReturn(browserEndpoint2);
         Mockito.when(browserSession2.getId()).thenReturn("2");
-        Mockito.when(dataServerSession.getAsyncRemote()).thenReturn(dataServerEndpoint);
-        Mockito.when(dataServerSession.getId()).thenReturn("3");
+        Mockito.when(webappSession.getAsyncRemote()).thenReturn(webappEndpoint);
+        Mockito.when(webappSession.getId()).thenReturn("3");
 
         Mockito.doAnswer(new Answer<RequestMessageHandler>() {
             @Override
@@ -93,11 +93,11 @@ public final class LocalClientServerTest {
         Mockito.doAnswer(new Answer<ReplyMessageHandler>() {
             @Override
             public ReplyMessageHandler answer(InvocationOnMock invocation) throws Throwable {
-                dataServerHandler = (ReplyMessageHandler) invocation.getArguments()[0];
+                webappHandler = (ReplyMessageHandler) invocation.getArguments()[0];
                 return null;
             }
         })
-                .when(dataServerSession)
+                .when(webappSession)
                 .addMessageHandler(Mockito.any(MessageHandler.class));
     }
 
@@ -109,15 +109,15 @@ public final class LocalClientServerTest {
         browserHandler1 = null;
         browserHandler2 = null;
 
-        browserServer.onOpen(browserSession1, endpointConfig);
-        browserServer.onOpen(browserSession2, endpointConfig);
+        webappServer.onOpen(browserSession1, endpointConfig);
+        webappServer.onOpen(browserSession2, endpointConfig);
 
-        dataServerHandler = null;
-        clientToDataServer.onOpen(dataServerSession, endpointConfig);
+        webappHandler = null;
+        webappClient.onOpen(webappSession, endpointConfig);
 
         Assert.assertNotNull(browserHandler1);
         Assert.assertNotNull(browserHandler2);
-        Assert.assertNotNull(dataServerHandler);
+        Assert.assertNotNull(webappHandler);
 
         MessageSubject subject = MessageSubjectFactory.create("Subject", "Subject1");
         RequestMessage msgSub = RequestMessage.create(subject, RequestMessageType.Subscribe);
@@ -125,14 +125,14 @@ public final class LocalClientServerTest {
 
         browserHandler1.onMessage(msgSub);
 
-        Mockito.verify(dataServerEndpoint, Mockito.times(1))
+        Mockito.verify(webappEndpoint, Mockito.times(1))
                 .sendObject(Mockito.refEq(msgSub, "timestamp"), Mockito.any(SendHandler.class));
 
         ReplyMessage msgConf = ReplyMessage.create(subject, "Subscribed to " + subject);
-        dataServerHandler.onMessage(msgConf);
+        webappHandler.onMessage(msgConf);
 
         ReplyMessage msgText = ReplyMessage.create(subject, "TestContent1");
-        dataServerHandler.onMessage(msgText);
+        webappHandler.onMessage(msgText);
 
         Mockito.verify(browserEndpoint2, Mockito.never())
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
@@ -144,10 +144,10 @@ public final class LocalClientServerTest {
         browserHandler2.onMessage(msgSub);
         browserHandler1.onMessage(msgUnsub);
 
-        Mockito.verify(dataServerEndpoint, Mockito.times(1))
+        Mockito.verify(webappEndpoint, Mockito.times(1))
                 .sendObject(Mockito.refEq(msgSub, "timestamp"), Mockito.any(SendHandler.class));
 
-        dataServerHandler.onMessage(msgText);
+        webappHandler.onMessage(msgText);
 
         Mockito.verify(browserEndpoint2, Mockito.times(1))
                 .sendObject(Mockito.eq(msgConf), Mockito.any(SendHandler.class));
@@ -159,10 +159,10 @@ public final class LocalClientServerTest {
                 .sendObject(Mockito.eq(msgText), Mockito.any(SendHandler.class));
 
         browserHandler2.onMessage(msgUnsub);
-        Mockito.verify(dataServerEndpoint, Mockito.times(1))
+        Mockito.verify(webappEndpoint, Mockito.times(1))
                 .sendObject(Mockito.refEq(msgUnsub, "timestamp"), Mockito.any(SendHandler.class));
 
-        dataServerHandler.onMessage(msgText);
+        webappHandler.onMessage(msgText);
         Mockito.verify(browserEndpoint2, Mockito.times(2))
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
         Mockito.verify(browserEndpoint1, Mockito.times(2))

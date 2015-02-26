@@ -24,13 +24,12 @@ public final class EndpointTest {
     private List<DiagnosticMessage> diagnosticMessages;
     private SessionManager manager;
     private SocketEndpoint endpoint;
-    private PublishSubject<DiagnosticMessage> diagnosticService;
 
     @Before
     public void setUp() {
         diagnosticMessages = new ArrayList<>();
         manager = Mockito.mock(SessionManager.class);
-        diagnosticService = PublishSubject.create();
+        PublishSubject<DiagnosticMessage> diagnosticService = PublishSubject.create();
         diagnosticService.subscribe(new Action1<DiagnosticMessage>() {
             @Override
             public void call(DiagnosticMessage t1) {

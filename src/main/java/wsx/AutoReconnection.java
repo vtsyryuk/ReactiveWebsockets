@@ -37,7 +37,7 @@ public class AutoReconnection implements Closeable {
     private Subscription closeSubscription;
     private Session serverSession;
 
-    public AutoReconnection(final Builder builder) {
+    private AutoReconnection(final Builder builder) {
 
         this.container = builder.container;
         this.clientEndpoint = builder.clientEndpoint;
@@ -180,9 +180,6 @@ public class AutoReconnection implements Closeable {
     }
 
     private static final class Noop implements Action0 {
-        public Noop() {
-        }
-
         @Override
         public void call() {
         }

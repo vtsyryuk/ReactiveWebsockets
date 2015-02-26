@@ -22,11 +22,11 @@ import java.util.List;
 @SuppressWarnings({"synthetic-access"})
 public final class HighLoadTest {
 
-    private SocketEndpoint clientToDataServer;
-    private SocketEndpoint browserServer;
-    private ReplyMessageHandler dataServerHandler;
-    private Session dataServerSession;
-    private Async dataServerEndpoint;
+    private SocketEndpoint webappClient;
+    private SocketEndpoint webappServer;
+    private ReplyMessageHandler webappHandler;
+    private Session webappSession;
+    private Async webappEndpoint;
     private int browserCount;
     private List<BrowserSessionMock> browsers;
     private int textMsgCount;
@@ -51,11 +51,11 @@ public final class HighLoadTest {
                         router.getRequestStream(),
                         textMessageService.getPublisher(), diagnosticPublisher, scheduler);
 
-        SessionManager dataServerSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
+        SessionManager webappSessionManager = new ReplyStreamSessionManager(textMessageHandlerFactory);
         SessionManager browserSessionManager = new RequestStreamSessionManager(requestMessageHandlerFactory);
 
-        clientToDataServer = new SocketEndpoint(dataServerSessionManager, diagnosticPublisher);
-        browserServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
+        webappClient = new SocketEndpoint(webappSessionManager, diagnosticPublisher);
+        webappServer = new SocketEndpoint(browserSessionManager, diagnosticPublisher);
 
         browserCount = 100;
         browsers = new ArrayList<>(browserCount);
@@ -92,24 +92,24 @@ public final class HighLoadTest {
             if (y >= textMsgCount) {
                 y -= textMsgCount;
             }
-            b.subjectRange = Pair.with(Integer.valueOf(x), Integer.valueOf(y));
+            b.subjectRange = Pair.with(x, y);
 
             browsers.add(b);
         }
 
-        dataServerSession = Mockito.mock(Session.class);
-        dataServerEndpoint = Mockito.mock(Async.class);
-        Mockito.when(dataServerSession.getAsyncRemote()).thenReturn(dataServerEndpoint);
-        Mockito.when(dataServerSession.getId()).thenReturn(String.valueOf(browserCount + 1));
+        webappSession = Mockito.mock(Session.class);
+        webappEndpoint = Mockito.mock(Async.class);
+        Mockito.when(webappSession.getAsyncRemote()).thenReturn(webappEndpoint);
+        Mockito.when(webappSession.getId()).thenReturn(String.valueOf(browserCount + 1));
 
         Mockito.doAnswer(new Answer<ReplyMessageHandler>() {
             @Override
             public ReplyMessageHandler answer(InvocationOnMock invocation) throws Throwable {
-                dataServerHandler = (ReplyMessageHandler) invocation.getArguments()[0];
+                webappHandler = (ReplyMessageHandler) invocation.getArguments()[0];
                 return null;
             }
         })
-                .when(dataServerSession)
+                .when(webappSession)
                 .addMessageHandler(Mockito.any(MessageHandler.class));
 
         for (int i = 0; i < textMsgCount; ++i) {
@@ -138,23 +138,23 @@ public final class HighLoadTest {
         }
 
         for (BrowserSessionMock m : browsers) {
-            browserServer.onOpen(m.session, endpointConfig);
+            webappServer.onOpen(m.session, endpointConfig);
         }
 
-        dataServerHandler = null;
-        clientToDataServer.onOpen(dataServerSession, endpointConfig);
+        webappHandler = null;
+        webappClient.onOpen(webappSession, endpointConfig);
 
         for (BrowserSessionMock m : browsers) {
             Assert.assertNotNull(m.handler);
         }
 
-        Assert.assertNotNull(dataServerHandler);
+        Assert.assertNotNull(webappHandler);
 
         // Subscribing each browser to a range of subjects
         for (BrowserSessionMock m : browsers) {
             final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0().intValue();
-            while (i != r.getValue1().intValue()) {
+            int i = r.getValue0();
+            while (i != r.getValue1()) {
                 m.handler.onMessage(subMessages.get(i));
                 ++i;
                 if (i >= textMsgCount) {
@@ -164,13 +164,13 @@ public final class HighLoadTest {
         }
 
         for (int i = 0; i < textMsgCount; i += textMsgCount / 10) {
-            Mockito.verify(dataServerEndpoint, Mockito.times(1))
+            Mockito.verify(webappEndpoint, Mockito.times(1))
                     .sendObject(Mockito.refEq(subMessages.get(i), "timestamp"), Mockito.any(SendHandler.class));
         }
 
         for (int i = 0; i < textMsgCount; ++i) {
             ReplyMessage msgConf = confMessages.get(i);
-            dataServerHandler.onMessage(msgConf);
+            webappHandler.onMessage(msgConf);
         }
 
         int messagesPerSubject = 5;
@@ -178,15 +178,15 @@ public final class HighLoadTest {
         for (int k = 0; k < messagesPerSubject; ++k) {
             for (int i = 0; i < textMsgCount; ++i) {
                 ReplyMessage msgText = textMessages.get(i);
-                dataServerHandler.onMessage(msgText);
+                webappHandler.onMessage(msgText);
             }
         }
 
         for (int k = 0; k < browserCount; k += browserCount / 10) {
             BrowserSessionMock m = browsers.get(k);
             final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0().intValue();
-            while (i != r.getValue1().intValue()) {
+            int i = r.getValue0();
+            while (i != r.getValue1()) {
                 Mockito.verify(m.endpoint, Mockito.times(1))
                         .sendObject(Mockito.eq(confMessages.get(i)), Mockito.any(SendHandler.class));
                 Mockito.verify(m.endpoint, Mockito.times(messagesPerSubject))
@@ -201,11 +201,11 @@ public final class HighLoadTest {
         // Unsubscribing browsers from all subjects except one
         for (BrowserSessionMock m : browsers) {
             final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0().intValue() + 1;
+            int i = r.getValue0() + 1;
             if (i >= textMsgCount) {
                 i -= textMsgCount;
             }
-            while (i != r.getValue1().intValue()) {
+            while (i != r.getValue1()) {
                 m.handler.onMessage(unsubMessages.get(i));
                 ++i;
                 if (i >= textMsgCount) {
@@ -215,15 +215,15 @@ public final class HighLoadTest {
         }
 
         for (int i = 0; i < textMsgCount; i += textMsgCount / 10) {
-            Mockito.verify(dataServerEndpoint, Mockito.never())
+            Mockito.verify(webappEndpoint, Mockito.never())
                     .sendObject(Mockito.refEq(unsubMessages.get(i)), Mockito.any(SendHandler.class));
         }
 
         // Unsubscribing all
         for (BrowserSessionMock m : browsers) {
             final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0().intValue();
-            while (i != r.getValue1().intValue()) {
+            int i = r.getValue0();
+            while (i != r.getValue1()) {
                 m.handler.onMessage(unsubMessages.get(i));
                 ++i;
                 if (i >= textMsgCount) {
@@ -233,7 +233,7 @@ public final class HighLoadTest {
         }
 
         for (int i = 0; i < textMsgCount; i += textMsgCount / 10) {
-            Mockito.verify(dataServerEndpoint, Mockito.times(1))
+            Mockito.verify(webappEndpoint, Mockito.times(1))
                     .sendObject(Mockito.refEq(unsubMessages.get(i), "timestamp"), Mockito.any(SendHandler.class));
         }
     }
@@ -248,11 +248,11 @@ public final class HighLoadTest {
         }
 
         for (BrowserSessionMock m : browsers) {
-            browserServer.onOpen(m.session, endpointConfig);
+            webappServer.onOpen(m.session, endpointConfig);
         }
 
-        dataServerHandler = null;
-        clientToDataServer.onOpen(dataServerSession, endpointConfig);
+        webappHandler = null;
+        webappClient.onOpen(webappSession, endpointConfig);
 
 
         int iterationCount = 10;
@@ -260,8 +260,8 @@ public final class HighLoadTest {
             // Subscribing each browser to a range of subjects
             for (BrowserSessionMock m : browsers) {
                 final Pair<Integer, Integer> r = m.subjectRange;
-                int i = r.getValue0().intValue();
-                while (i != r.getValue1().intValue()) {
+                int i = r.getValue0();
+                while (i != r.getValue1()) {
                     m.handler.onMessage(subMessages.get(i));
                     ++i;
                     if (i >= textMsgCount) {
@@ -272,7 +272,7 @@ public final class HighLoadTest {
 
             for (int i = 0; i < textMsgCount; ++i) {
                 ReplyMessage msgConf = confMessages.get(i);
-                dataServerHandler.onMessage(msgConf);
+                webappHandler.onMessage(msgConf);
             }
 
             int messagesPerSubject = 5;
@@ -280,18 +280,18 @@ public final class HighLoadTest {
             for (int k = 0; k < messagesPerSubject; ++k) {
                 for (int i = 0; i < textMsgCount; ++i) {
                     ReplyMessage msgText = textMessages.get(i);
-                    dataServerHandler.onMessage(msgText);
+                    webappHandler.onMessage(msgText);
                 }
             }
 
             // Unsubscribing browsers from all subjects except one
             for (BrowserSessionMock m : browsers) {
                 final Pair<Integer, Integer> r = m.subjectRange;
-                int i = r.getValue0().intValue() + 1;
+                int i = r.getValue0() + 1;
                 if (i >= textMsgCount) {
                     i -= textMsgCount;
                 }
-                while (i != r.getValue1().intValue()) {
+                while (i != r.getValue1()) {
                     m.handler.onMessage(unsubMessages.get(i));
                     ++i;
                     if (i >= textMsgCount) {
@@ -303,8 +303,8 @@ public final class HighLoadTest {
             // Unsubscribing all
             for (BrowserSessionMock m : browsers) {
                 final Pair<Integer, Integer> r = m.subjectRange;
-                int i = r.getValue0().intValue();
-                while (i != r.getValue1().intValue()) {
+                int i = r.getValue0();
+                while (i != r.getValue1()) {
                     m.handler.onMessage(unsubMessages.get(i));
                     ++i;
                     if (i >= textMsgCount) {
