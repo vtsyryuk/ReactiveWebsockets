@@ -43,7 +43,7 @@ jobs:
       - name: Build with Gradle Wrapper
         id: gradle-build
         continue-on-error: true
-        run: ./gradlew build jacocoTestReport --no-daemon
+        run: ./gradlew test build jacocoTestReport --no-daemon
 
       - name: Publish coverage summary
         if: always()

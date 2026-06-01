@@ -23,7 +23,14 @@ jobs:
           java-version: "25"
           cache: gradle
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          build-scan-publish: true
+          build-scan-terms-of-use-url: https://gradle.com/terms-of-service
+          build-scan-terms-of-use-agree: "yes"
+
       - name: Deploy
-        run: ./gradlew publish --no-daemon
+        run: ./gradlew publishJarToMaven --no-daemon
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

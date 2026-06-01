@@ -76,6 +76,16 @@ tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
 }
 
+tasks.withType(PublishToMavenRepository).configureEach {
+    dependsOn tasks.named('check')
+}
+
+tasks.register('publishJarToMaven') {
+    group = 'publishing'
+    description = 'Runs verification, builds the Java artifacts, and publishes them to the configured Maven repository.'
+    dependsOn tasks.named('publishMavenJavaPublicationToGitHubPackagesRepository')
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {

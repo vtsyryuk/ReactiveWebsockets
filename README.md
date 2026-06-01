@@ -64,9 +64,16 @@ Packages are deployed to GitHub Packages by `.github/workflows/deploy.yml` when 
 The deployment workflow uses:
 
 - `actions/setup-java@v4`
+- `gradle/actions/setup-gradle@v6` with build scan publishing enabled
 - Temurin Java 25
-- Gradle `publish`
+- Gradle `publishJarToMaven`, which runs verification before publishing
 - `GITHUB_TOKEN` with `packages: write`
+
+To run the same publish path locally, provide GitHub Packages credentials through `gpr.user`/`gpr.key` Gradle properties or `GITHUB_ACTOR`/`GITHUB_TOKEN` environment variables:
+
+```bash
+./gradlew publishJarToMaven
+```
 
 ## Basic Usage
 
