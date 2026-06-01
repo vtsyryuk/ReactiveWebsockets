@@ -2,6 +2,8 @@
   "recommendations": [
     "vscjava.vscode-java-pack",
     "vscjava.vscode-gradle",
-    "redhat.java"
+    "redhat.java",
+    "vscjava.vscode-java-test",
+    "vscjava.vscode-java-dependency"
   ]
 }

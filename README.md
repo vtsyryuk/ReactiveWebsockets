@@ -38,6 +38,15 @@ Open the repository folder in VS Code and install the recommended extensions whe
 - `Gradle: test`
 - `Gradle: coverage`
 
+If VS Code reports `there is no registered task type 'Java'`, install the recommended Java extensions and reload the window. This workspace only defines shell-based Gradle tasks, so a `Java` task usually comes from a stale user task or an extension-provided task that is unavailable.
+
+To clear it:
+
+1. Run `Extensions: Show Recommended Extensions` and install the recommendations.
+2. Run `Developer: Reload Window`.
+3. Run `Tasks: Run Task` and choose `Gradle: test`.
+4. If the error remains, run `Tasks: Open User Tasks` and remove any task whose `"type"` is `"Java"`.
+
 ## Publish
 
 Packages are deployed to GitHub Packages by `.github/workflows/deploy.yml` when a GitHub release is published, or when the workflow is run manually.
