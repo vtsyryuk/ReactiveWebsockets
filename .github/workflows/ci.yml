@@ -24,4 +24,4 @@ jobs:
           cache: gradle
 
       - name: Verify
-        run: ./gradlew build --no-daemon
+        run: ./gradlew build test --no-daemon
