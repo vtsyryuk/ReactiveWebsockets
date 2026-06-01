@@ -18,7 +18,7 @@ jobs:
 
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
@@ -37,15 +37,24 @@ jobs:
         run: ./gradlew --version --no-daemon
 
       - name: Build with Gradle Wrapper
+        id: gradle-build
+        continue-on-error: true
         run: ./gradlew build jacocoTestReport --no-daemon
 
       - name: Publish coverage summary
+        if: always()
         run: |
           python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
           report = Path("build/reports/jacoco/test/jacocoTestReport.xml")
+          if not report.exists():
+              print("## Code Coverage")
+              print()
+              print("Coverage report was not generated.")
+              raise SystemExit(0)
+
           root = ET.parse(report).getroot()
 
           counters = {
@@ -69,13 +78,91 @@ jobs:
           PY
 
       - name: Upload JaCoCo coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-coverage-report
           path: |
             build/reports/jacoco/test/html/**
             build/reports/jacoco/test/jacocoTestReport.xml
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - name: Update README build and coverage status
+        if: github.event_name == 'push'
+        env:
+          BUILD_OUTCOME: ${{ steps.gradle-build.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          readme_path = Path("README.md")
+          readme = readme_path.read_text()
+          start = "<!-- ci-status:start -->"
+          end = "<!-- ci-status:end -->"
+          outcome = os.environ["BUILD_OUTCOME"]
+          status = "Passing" if outcome == "success" else "Failing"
+          status_badge = "✅ Passing" if outcome == "success" else "❌ Failing"
+          report = Path("build/reports/jacoco/test/jacocoTestReport.xml")
+          coverage = {"LINE": "N/A", "BRANCH": "N/A", "INSTRUCTION": "N/A"}
+
+          if report.exists():
+              root = ET.parse(report).getroot()
+              for counter in root.findall("counter"):
+                  metric = counter.attrib["type"]
+                  if metric in coverage:
+                      missed = int(counter.attrib["missed"])
+                      covered = int(counter.attrib["covered"])
+                      total = missed + covered
+                      coverage[metric] = f"{(100.0 * covered / total if total else 100.0):.2f}%"
+
+          run_url = (
+              f"{os.environ['GITHUB_SERVER_URL']}/"
+              f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+              f"{os.environ['GITHUB_RUN_ID']}"
+          )
+          short_sha = os.environ["GITHUB_SHA"][:7]
+          timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+          new_block = "\n".join([
+              start,
+              "## CI Status",
+              "",
+              "| Build | Line Coverage | Branch Coverage | Instruction Coverage | Workflow Run |",
+              "| --- | ---: | ---: | ---: | --- |",
+              f"| {status_badge} | {coverage['LINE']} | {coverage['BRANCH']} | {coverage['INSTRUCTION']} | [#{os.environ['GITHUB_RUN_NUMBER']}]({run_url}) |",
+              "",
+              f"Last updated from `{os.environ['GITHUB_REF_NAME']}` at {timestamp} for commit `{short_sha}`.",
+              end,
+          ])
+
+          if start in readme and end in readme:
+              before = readme.split(start, 1)[0]
+              after = readme.split(end, 1)[1]
+              readme = before + new_block + after
+          else:
+              readme = readme.replace("# ReactiveWebsockets\n", "# ReactiveWebsockets\n\n" + new_block + "\n", 1)
+
+          readme_path.write_text(readme)
+          PY
+
+      - name: Commit README status update
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet README.md; then
+            echo "README status is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update README CI status [skip ci]"
+          git push
+
+      - name: Fail if Gradle build failed
+        if: steps.gradle-build.outcome != 'success'
+        run: exit 1
 
   dependency-submission:
 

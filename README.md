@@ -2,6 +2,14 @@
 
 ReactiveWebsockets is a small Java library for routing websocket subscribe/unsubscribe requests to RxJava streams and publishing replies back to websocket clients.
 
+<!-- ci-status:start -->
+## CI Status
+
+| Build | Line Coverage | Branch Coverage | Workflow Run |
+| --- | ---: | ---: | --- |
+| Pending | N/A | N/A | N/A |
+<!-- ci-status:end -->
+
 ## Requirements
 
 - Java 25
