@@ -1,0 +1,15 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.import.gradle.enabled": true,
+  "java.import.gradle.wrapper.enabled": true,
+  "java.test.config": [
+    {
+      "name": "JUnit",
+      "workingDirectory": "${workspaceFolder}",
+      "vmArgs": []
+    }
+  ],
+  "gradle.nestedProjects": false,
+  "gradle.wrapper.enabled": true
+}

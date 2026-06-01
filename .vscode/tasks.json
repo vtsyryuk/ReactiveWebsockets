@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Gradle: build",
+      "type": "shell",
+      "command": "./gradlew build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$javac"
+    },
+    {
+      "label": "Gradle: test",
+      "type": "shell",
+      "command": "./gradlew test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": "$javac"
+    },
+    {
+      "label": "Gradle: coverage",
+      "type": "shell",
+      "command": "./gradlew test jacocoTestReport",
+      "group": "test",
+      "problemMatcher": "$javac"
+    }
+  ]
+}

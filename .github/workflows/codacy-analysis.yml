@@ -18,6 +18,9 @@ jobs:
   codacy-security-scan:
     name: Codacy Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       # Checkout the repository to the GitHub Actions runner
       - name: Checkout code
@@ -36,9 +39,28 @@ jobs:
           # Force 0 exit code to allow SARIF file generation
           # This will handover control about PR rejection to the GitHub side
           max-allowed-issues: 2147483647
+
+      # GitHub code scanning requires each SARIF run to have a unique category.
+      # Codacy can emit multiple runs with the same or missing automationDetails.id.
+      - name: Normalize SARIF run categories
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          sarif_path = Path("results.sarif")
+          sarif = json.loads(sarif_path.read_text())
+
+          for index, run in enumerate(sarif.get("runs", []), start=1):
+              tool = run.get("tool", {}).get("driver", {}).get("name", "codacy")
+              safe_tool = "".join(ch if ch.isalnum() else "-" for ch in tool.lower()).strip("-") or "codacy"
+              run["automationDetails"] = {"id": f"codacy/{index:03d}-{safe_tool}"}
+
+          sarif_path.write_text(json.dumps(sarif, separators=(",", ":")))
+          PY
       
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif

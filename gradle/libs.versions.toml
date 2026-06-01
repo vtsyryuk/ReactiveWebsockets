@@ -1,0 +1,19 @@
+[versions]
+gson = "2.13.2"
+jacoco = "0.8.14"
+java = "25"
+junit-jupiter = "6.1.0"
+junit-platform = "6.1.0"
+mockito = "5.23.0"
+rxjava = "3.1.12"
+spring = "7.0.7"
+javaee-api = "7.0"
+
+[libraries]
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+javaee-api = { module = "javax:javaee-api", version.ref = "javaee-api" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+rxjava = { module = "io.reactivex.rxjava3:rxjava", version.ref = "rxjava" }
+spring-context = { module = "org.springframework:spring-context", version.ref = "spring" }

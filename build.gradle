@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'jacoco'
     id 'maven-publish'
 }
 
@@ -9,37 +10,70 @@ description = 'Reactive websocket subscription routing for Java.'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get().toInteger())
     }
     withSourcesJar()
     withJavadocJar()
 }
 
 dependencies {
-    api 'io.reactivex.rxjava3:rxjava:3.1.12'
-    api 'com.google.code.gson:gson:2.13.2'
+    api libs.rxjava
+    api libs.gson
 
-    compileOnly 'javax:javaee-api:7.0'
-    compileOnly 'org.springframework:spring-context:7.0.7'
+    compileOnly libs.javaee.api
+    compileOnly libs.spring.context
 
-    testImplementation 'javax:javaee-api:7.0'
-    testImplementation 'org.springframework:spring-context:7.0.7'
-    testImplementation 'org.junit.jupiter:junit-jupiter:6.1.0'
-    testImplementation 'org.mockito:mockito-core:5.23.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation libs.javaee.api
+    testImplementation libs.spring.context
+    testImplementation libs.junit.jupiter
+    testImplementation libs.mockito.core
+    testRuntimeOnly libs.junit.platform.launcher
 }
 
 tasks.withType(JavaCompile).configureEach {
-    options.release = 25
+    options.release = libs.versions.java.get().toInteger()
     options.encoding = 'UTF-8'
 }
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+    }
 }
 
 tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+    dependsOn tasks.named('test')
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.0
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
 }
 
 publishing {

@@ -16,6 +16,28 @@ ReactiveWebsockets is a small Java library for routing websocket subscribe/unsub
 
 The GitHub Actions CI workflow runs the same Gradle build on pushes and pull requests to `main` and `master`.
 
+## Test and Coverage
+
+```bash
+./gradlew test
+./gradlew jacocoTestReport
+```
+
+Coverage reports are written to:
+
+- HTML: `build/reports/jacoco/test/html/index.html`
+- XML: `build/reports/jacoco/test/jacocoTestReport.xml`
+
+Gradle is configured to use a Java 25 toolchain. If Java 25 is not available locally, Gradle can download a matching toolchain through the Foojay resolver.
+
+## VS Code
+
+Open the repository folder in VS Code and install the recommended extensions when prompted. The workspace includes tasks for:
+
+- `Gradle: build`
+- `Gradle: test`
+- `Gradle: coverage`
+
 ## Publish
 
 Packages are deployed to GitHub Packages by `.github/workflows/deploy.yml` when a GitHub release is published, or when the workflow is run manually.
