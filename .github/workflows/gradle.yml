@@ -37,7 +37,45 @@ jobs:
         run: ./gradlew --version --no-daemon
 
       - name: Build with Gradle Wrapper
-        run: ./gradlew build --no-daemon
+        run: ./gradlew build jacocoTestReport --no-daemon
+
+      - name: Publish coverage summary
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report = Path("build/reports/jacoco/test/jacocoTestReport.xml")
+          root = ET.parse(report).getroot()
+
+          counters = {
+              counter.attrib["type"]: counter.attrib
+              for counter in root.findall("counter")
+          }
+
+          print("## Code Coverage")
+          print()
+          print("| Metric | Covered | Missed | Coverage |")
+          print("| --- | ---: | ---: | ---: |")
+          for metric in ("LINE", "BRANCH", "INSTRUCTION"):
+              counter = counters[metric]
+              missed = int(counter["missed"])
+              covered = int(counter["covered"])
+              total = missed + covered
+              pct = 100.0 * covered / total if total else 100.0
+              print(f"| {metric.title()} | {covered} | {missed} | {pct:.2f}% |")
+          print()
+          print("Full HTML and XML reports are attached as the `jacoco-coverage-report` artifact.")
+          PY
+
+      - name: Upload JaCoCo coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage-report
+          path: |
+            build/reports/jacoco/test/html/**
+            build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: error
 
   dependency-submission:
 
