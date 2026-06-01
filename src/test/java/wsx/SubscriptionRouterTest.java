@@ -93,4 +93,24 @@ public final class SubscriptionRouterTest {
         assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
         assertEquals(1, streamIdentities.size());
     }
+
+    @Test
+    public void resendSubscribeRequestsEmitsCurrentSubjects() {
+        MessageSubject first = MessageSubjectFactory.create("Subject", "Subject1");
+        MessageSubject second = MessageSubjectFactory.create("Subject", "Subject2");
+
+        Disposable firstSubscription = router.getDataStream(first).subscribe();
+        Disposable secondSubscription = router.getDataStream(second).subscribe();
+        requests.clear();
+
+        router.reSendSubscribeRequests();
+
+        assertEquals(2, requests.size());
+        assertTrue(requests.stream().allMatch(request -> request.getContent() == RequestMessageType.Subscribe));
+        assertTrue(requests.stream().map(RequestMessage::getSubject).anyMatch(first::equals));
+        assertTrue(requests.stream().map(RequestMessage::getSubject).anyMatch(second::equals));
+
+        firstSubscription.dispose();
+        secondSubscription.dispose();
+    }
 }
