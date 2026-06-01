@@ -1,13 +1,11 @@
 package wsx;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import rx.functions.Action0;
-import rx.functions.Action1;
-import rx.subjects.PublishSubject;
-import rx.subscriptions.Subscriptions;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 import javax.websocket.CloseReason;
 import javax.websocket.CloseReason.CloseCodes;
@@ -17,7 +15,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public final class EndpointTest {
 
@@ -25,21 +23,16 @@ public final class EndpointTest {
     private SessionManager manager;
     private SocketEndpoint endpoint;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         diagnosticMessages = new ArrayList<>();
         manager = Mockito.mock(SessionManager.class);
         PublishSubject<DiagnosticMessage> diagnosticService = PublishSubject.create();
-        diagnosticService.subscribe(new Action1<DiagnosticMessage>() {
-            @Override
-            public void call(DiagnosticMessage t1) {
-                diagnosticMessages.add(t1);
-            }
-        });
+        diagnosticService.subscribe(diagnosticMessages::add);
         endpoint = new SocketEndpoint(manager, diagnosticService);
     }
 
-    @After
+    @AfterEach
     public void teardown() {
     }
 
@@ -47,7 +40,7 @@ public final class EndpointTest {
     public void onOpenTest() throws IOException {
         try (Session session1 = Mockito.mock(Session.class)) {
             Mockito.when(session1.getId()).thenReturn("1");
-            Mockito.when(manager.attach(session1)).thenReturn(Subscriptions.empty());
+            Mockito.when(manager.attach(session1)).thenReturn(Disposable.empty());
 
             try (Session session2 = Mockito.mock(Session.class)) {
                 EndpointConfig config = Mockito.mock(EndpointConfig.class);
@@ -63,7 +56,7 @@ public final class EndpointTest {
     public void onErrorTest() throws IOException {
         try (Session session1 = Mockito.mock(Session.class)) {
             Mockito.when(session1.getId()).thenReturn("1");
-            Mockito.when(manager.attach(session1)).thenReturn(Subscriptions.empty());
+            Mockito.when(manager.attach(session1)).thenReturn(Disposable.empty());
 
             endpoint.onError(session1, new Exception("TestError1"));
             assertEquals(1, diagnosticMessages.size());
@@ -76,15 +69,7 @@ public final class EndpointTest {
             Mockito.when(session1.getId()).thenReturn("1");
             final boolean[] sessionClosed = {false};
 
-            final Action0 unsubscribe = new Action0() {
-
-                @Override
-                public void call() {
-                    // TODO Auto-generated method stub
-                    sessionClosed[0] = true;
-                }
-            };
-            Mockito.when(manager.attach(session1)).thenReturn(Subscriptions.create(unsubscribe));
+            Mockito.when(manager.attach(session1)).thenReturn(Disposable.fromAction(() -> sessionClosed[0] = true));
             CloseReason closeReason = new CloseReason(CloseCodes.NORMAL_CLOSURE, "Goodbye");
             endpoint.onClose(session1, closeReason);
 

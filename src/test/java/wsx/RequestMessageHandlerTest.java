@@ -1,13 +1,12 @@
 package wsx;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import rx.Observable;
-import rx.functions.Action0;
-import rx.schedulers.Schedulers;
-import rx.subjects.PublishSubject;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
+import io.reactivex.rxjava3.subjects.PublishSubject;
 
 import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.SendHandler;
@@ -22,7 +21,7 @@ public final class RequestMessageHandlerTest {
     private Async clientEndpointMock;
     private int dataSubscriptionCount;
 
-    @Before
+    @BeforeEach
     @SuppressWarnings("synthetic-access")
     public void setUp() {
         clientEndpointMock = Mockito.mock(Async.class);
@@ -30,17 +29,8 @@ public final class RequestMessageHandlerTest {
         mockDataStream = PublishSubject.create();
         dataSubscriptionCount = 0;
         Observable<ReplyMessage> textStream = mockDataStream
-                .doOnSubscribe(new Action0() {
-                    @Override
-                    public void call() {
-                        dataSubscriptionCount++;
-                    }
-                }).doOnUnsubscribe(new Action0() {
-                    @Override
-                    public void call() {
-                        dataSubscriptionCount--;
-                    }
-                });
+                .doOnSubscribe(disposable -> dataSubscriptionCount++)
+                .doOnDispose(() -> dataSubscriptionCount--);
         Mockito.when(routerMock.getDataStream(Mockito.any(MessageSubject.class))).thenReturn(textStream);
         PublishSubject<DiagnosticMessage> diagnosticSubjectMock = PublishSubject.create();
         msgHandler = new RequestMessageHandler(clientEndpointMock, routerMock, diagnosticSubjectMock, Schedulers.trampoline());
@@ -56,7 +46,7 @@ public final class RequestMessageHandlerTest {
         msgHandler.onMessage(msg);
 
         Mockito.verify(routerMock, Mockito.times(1)).getDataStream(subject);
-        Assert.assertEquals(1, dataSubscriptionCount);
+        assertEquals(1, dataSubscriptionCount);
 
         String content = "testContent1";
         mockDataStream.onNext(ReplyMessage.create(subject, content));
@@ -70,7 +60,7 @@ public final class RequestMessageHandlerTest {
         mockDataStream.onNext(ReplyMessage.create(subject, content));
         Mockito.verify(clientEndpointMock, Mockito.times(1))
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
-        Assert.assertEquals(0, dataSubscriptionCount);
+        assertEquals(0, dataSubscriptionCount);
     }
 
     @Test
@@ -84,7 +74,7 @@ public final class RequestMessageHandlerTest {
             msgHandler.onMessage(msg);
             msgHandler.onMessage(msg);
         } catch (Exception e) {
-            Assert.fail("Duplicate subscribe command having the same subject should not throw");
+            fail("Duplicate subscribe command having the same subject should not throw");
         }
 
         String content = "testContent1";
@@ -98,7 +88,7 @@ public final class RequestMessageHandlerTest {
             msgHandler.onMessage(msg);
             msgHandler.onMessage(msg);
         } catch (Exception e) {
-            Assert.fail("Duplicate unsubscribe command having the same subject should not throw");
+            fail("Duplicate unsubscribe command having the same subject should not throw");
         }
         mockDataStream.onNext(ReplyMessage.create(key, content));
         Mockito.verify(clientEndpointMock, Mockito.times(1))
@@ -121,7 +111,7 @@ public final class RequestMessageHandlerTest {
         try {
             msgHandler.close();
         } catch (IOException e) {
-            Assert.fail("close thrown unexpected exception");
+            fail("close thrown unexpected exception");
         }
 
         mockDataStream.onNext(ReplyMessage.create(subject, content));

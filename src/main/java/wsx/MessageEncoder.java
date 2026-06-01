@@ -2,20 +2,19 @@ package wsx;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.joda.time.DateTime;
 
 import javax.websocket.EncodeException;
 import javax.websocket.Encoder;
 import javax.websocket.EndpointConfig;
 import java.io.IOException;
 import java.io.Writer;
+import java.time.Instant;
 
 public class MessageEncoder<M extends Message<?>> implements Encoder.TextStream<M> {
 
-    private static Gson gson = new GsonBuilder()
-            .setDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+    private static final Gson gson = new GsonBuilder()
             .enableComplexMapKeySerialization()
-            .registerTypeAdapter(DateTime.class, new DateTimeTypeConverter<>())
+            .registerTypeAdapter(Instant.class, new InstantTypeAdapter())
             .serializeSpecialFloatingPointValues()
             .create();
 
@@ -32,4 +31,3 @@ public class MessageEncoder<M extends Message<?>> implements Encoder.TextStream<
         gson.toJson(message, message.getClass(), writer);
     }
 }
-

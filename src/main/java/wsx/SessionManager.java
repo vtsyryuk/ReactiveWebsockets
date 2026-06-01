@@ -1,11 +1,11 @@
 package wsx;
 
-import rx.Subscription;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 import javax.websocket.Session;
 
 public interface SessionManager {
 
-    Subscription attach(Session session);
+    Disposable attach(Session session);
 
 }

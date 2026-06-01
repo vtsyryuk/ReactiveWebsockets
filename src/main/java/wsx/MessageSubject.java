@@ -1,23 +1,25 @@
 package wsx;
 
-import org.javatuples.Pair;
-
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
-public class MessageSubject {
+public final class MessageSubject {
     private final Map<String, String> fields;
 
     public MessageSubject(Map<String, String> fields) {
-        this.fields = new HashMap<>(fields);
+        this.fields = Collections.unmodifiableMap(new HashMap<>(Objects.requireNonNull(fields, "fields")));
     }
 
-    @SafeVarargs
-    public MessageSubject(Pair<String, String>... fields) {
-        this.fields = new HashMap<>(fields.length);
-        for (Pair<String, String> item : fields) {
-            this.fields.put(item.getValue0(), item.getValue1());
-        }
+    public static MessageSubject of(String name, String value) {
+        Map<String, String> fields = new HashMap<>(1);
+        fields.put(name, value);
+        return new MessageSubject(fields);
+    }
+
+    public Map<String, String> getFields() {
+        return fields;
     }
 
     @Override

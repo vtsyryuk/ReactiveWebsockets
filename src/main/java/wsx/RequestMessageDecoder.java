@@ -5,4 +5,8 @@ import org.springframework.stereotype.Component;
 @Component
 public final class RequestMessageDecoder extends MessageDecoder<RequestMessage> {
 
+    @Override
+    protected Class<RequestMessage> messageClass() {
+        return RequestMessage.class;
+    }
 }

@@ -1,15 +1,14 @@
 package wsx;
 
-import org.javatuples.Pair;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import rx.Observer;
-import rx.Scheduler;
-import rx.schedulers.Schedulers;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.core.Scheduler;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
@@ -35,9 +34,9 @@ public final class HighLoadTest {
     private List<RequestMessage> subMessages;
     private List<RequestMessage> unsubMessages;
 
-    @Before
+    @BeforeEach
     public void setUp() {
-        Scheduler scheduler = Schedulers.immediate();
+        Scheduler scheduler = Schedulers.trampoline();
         Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
         ReplyMessageService textMessageService = new ReplyMessageService();
 
@@ -92,7 +91,7 @@ public final class HighLoadTest {
             if (y >= textMsgCount) {
                 y -= textMsgCount;
             }
-            b.subjectRange = Pair.with(x, y);
+            b.subjectRange = new Range(x, y);
 
             browsers.add(b);
         }
@@ -145,16 +144,16 @@ public final class HighLoadTest {
         webappClient.onOpen(webappSession, endpointConfig);
 
         for (BrowserSessionMock m : browsers) {
-            Assert.assertNotNull(m.handler);
+            assertNotNull(m.handler);
         }
 
-        Assert.assertNotNull(webappHandler);
+        assertNotNull(webappHandler);
 
         // Subscribing each browser to a range of subjects
         for (BrowserSessionMock m : browsers) {
-            final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0();
-            while (i != r.getValue1()) {
+            final Range r = m.subjectRange;
+            int i = r.start();
+            while (i != r.end()) {
                 m.handler.onMessage(subMessages.get(i));
                 ++i;
                 if (i >= textMsgCount) {
@@ -184,9 +183,9 @@ public final class HighLoadTest {
 
         for (int k = 0; k < browserCount; k += browserCount / 10) {
             BrowserSessionMock m = browsers.get(k);
-            final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0();
-            while (i != r.getValue1()) {
+            final Range r = m.subjectRange;
+            int i = r.start();
+            while (i != r.end()) {
                 Mockito.verify(m.endpoint, Mockito.times(1))
                         .sendObject(Mockito.eq(confMessages.get(i)), Mockito.any(SendHandler.class));
                 Mockito.verify(m.endpoint, Mockito.times(messagesPerSubject))
@@ -200,12 +199,12 @@ public final class HighLoadTest {
 
         // Unsubscribing browsers from all subjects except one
         for (BrowserSessionMock m : browsers) {
-            final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0() + 1;
+            final Range r = m.subjectRange;
+            int i = r.start() + 1;
             if (i >= textMsgCount) {
                 i -= textMsgCount;
             }
-            while (i != r.getValue1()) {
+            while (i != r.end()) {
                 m.handler.onMessage(unsubMessages.get(i));
                 ++i;
                 if (i >= textMsgCount) {
@@ -221,9 +220,9 @@ public final class HighLoadTest {
 
         // Unsubscribing all
         for (BrowserSessionMock m : browsers) {
-            final Pair<Integer, Integer> r = m.subjectRange;
-            int i = r.getValue0();
-            while (i != r.getValue1()) {
+            final Range r = m.subjectRange;
+            int i = r.start();
+            while (i != r.end()) {
                 m.handler.onMessage(unsubMessages.get(i));
                 ++i;
                 if (i >= textMsgCount) {
@@ -259,9 +258,9 @@ public final class HighLoadTest {
         for (int j = 0; j < iterationCount; ++j) {
             // Subscribing each browser to a range of subjects
             for (BrowserSessionMock m : browsers) {
-                final Pair<Integer, Integer> r = m.subjectRange;
-                int i = r.getValue0();
-                while (i != r.getValue1()) {
+                final Range r = m.subjectRange;
+                int i = r.start();
+                while (i != r.end()) {
                     m.handler.onMessage(subMessages.get(i));
                     ++i;
                     if (i >= textMsgCount) {
@@ -286,12 +285,12 @@ public final class HighLoadTest {
 
             // Unsubscribing browsers from all subjects except one
             for (BrowserSessionMock m : browsers) {
-                final Pair<Integer, Integer> r = m.subjectRange;
-                int i = r.getValue0() + 1;
+                final Range r = m.subjectRange;
+                int i = r.start() + 1;
                 if (i >= textMsgCount) {
                     i -= textMsgCount;
                 }
-                while (i != r.getValue1()) {
+                while (i != r.end()) {
                     m.handler.onMessage(unsubMessages.get(i));
                     ++i;
                     if (i >= textMsgCount) {
@@ -302,9 +301,9 @@ public final class HighLoadTest {
 
             // Unsubscribing all
             for (BrowserSessionMock m : browsers) {
-                final Pair<Integer, Integer> r = m.subjectRange;
-                int i = r.getValue0();
-                while (i != r.getValue1()) {
+                final Range r = m.subjectRange;
+                int i = r.start();
+                while (i != r.end()) {
                     m.handler.onMessage(unsubMessages.get(i));
                     ++i;
                     if (i >= textMsgCount) {
@@ -320,6 +319,9 @@ public final class HighLoadTest {
         public Session session;
         public RequestMessageHandler handler;
         public Async endpoint;
-        public Pair<Integer, Integer> subjectRange;
+        public Range subjectRange;
+    }
+
+    private record Range(int start, int end) {
     }
 }

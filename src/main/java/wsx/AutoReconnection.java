@@ -1,41 +1,39 @@
 package wsx;
 
-import com.google.common.base.Preconditions;
-import org.javatuples.Pair;
-import rx.Observable;
-import rx.Observer;
-import rx.Scheduler;
-import rx.Subscription;
-import rx.functions.Action0;
-import rx.functions.Action1;
-import rx.functions.Func1;
-import rx.schedulers.Schedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.core.Scheduler;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.functions.Action;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import javax.websocket.ClientEndpointConfig;
-import javax.websocket.CloseReason;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("synthetic-access")
 public class AutoReconnection implements Closeable {
 
-    private static final MessageSubject ConnStatusSubject = new MessageSubject(Pair.with("Connection", "Status"));
+    private static final MessageSubject CONNECTION_STATUS_SUBJECT = MessageSubject.of("Connection", "Status");
     private final WebSocketContainer container;
     private final SocketEndpoint clientEndpoint;
     private final ClientEndpointConfig clientConfig;
     private final URI serverUri;
-    private final Action0 greetingAction;
+    private final Action greetingAction;
     private final Observer<DiagnosticMessage> diagnosticPublisher;
     private final Scheduler scheduler;
     private final long delay;
     private final long period;
     private final TimeUnit unit;
-    private Subscription closeSubscription;
+    private Disposable closeDisposable;
+    private Disposable reconnectDisposable;
     private Session serverSession;
+    private boolean closed;
 
     private AutoReconnection(final Builder builder) {
 
@@ -51,53 +49,53 @@ public class AutoReconnection implements Closeable {
         this.period = builder.period;
         this.unit = builder.unit;
 
-        this.closeSubscription = clientEndpoint.getCloseObservable().subscribe(new Action1<Pair<Session, CloseReason>>() {
-
-            @Override
-            public void call(Pair<Session, CloseReason> p) {
-                ReplyMessage msg = ReplyMessage.create(ConnStatusSubject, p.getValue1().getReasonPhrase());
-                builder.replyPublisher.onNext(msg);
-                connectToServer();
-            }
+        this.closeDisposable = clientEndpoint.getCloseObservable().subscribe(closedSession -> {
+            ReplyMessage msg = ReplyMessage.create(CONNECTION_STATUS_SUBJECT,
+                    closedSession.closeReason().getReasonPhrase());
+            builder.replyPublisher.onNext(msg);
+            connectToServer();
         });
 
         connectToServer();
     }
 
-    private void connectToServer() {
+    private synchronized void connectToServer() {
+        if (closed) {
+            return;
+        }
+        if (reconnectDisposable != null && !reconnectDisposable.isDisposed()) {
+            reconnectDisposable.dispose();
+        }
 
         final Observable<Long> timer = Observable
-                .timer(delay, period, unit)
-                .observeOn(scheduler);
+                .interval(delay, period, unit, scheduler);
 
-        timer.takeFirst(new Func1<Long, Boolean>() {
-            boolean requestsResent = false;
-
-            @Override
-            public Boolean call(Long t1) {
-                try {
-                    if (requestsResent) {
-                        System.out.println("Unexpected timer event");
-                        return Boolean.TRUE;
+        reconnectDisposable = timer
+                .filter(tick -> {
+                    try {
+                        serverSession = container.connectToServer(clientEndpoint, clientConfig, serverUri);
+                        greetingAction.run();
+                        return true;
+                    } catch (Throwable e) {
+                        diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, e.getMessage()));
+                        return false;
                     }
-                    serverSession = container.connectToServer(clientEndpoint, clientConfig, serverUri);
-                    greetingAction.call();
-                    requestsResent = true;
-                    return Boolean.TRUE;
-                } catch (Exception e) {
-                    diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, e.getMessage()));
-                    return Boolean.FALSE;
-                }
-            }
-        }).subscribe();
+                })
+                .take(1)
+                .subscribe();
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         try {
-            if (closeSubscription != null) {
-                closeSubscription.unsubscribe();
-                closeSubscription = null;
+            closed = true;
+            if (closeDisposable != null) {
+                closeDisposable.dispose();
+                closeDisposable = null;
+            }
+            if (reconnectDisposable != null) {
+                reconnectDisposable.dispose();
+                reconnectDisposable = null;
             }
             if (serverSession != null && serverSession.isOpen()) {
                 serverSession.close();
@@ -121,7 +119,7 @@ public class AutoReconnection implements Closeable {
         private long delay = 0L;
         private long period = 5L;
         private TimeUnit unit = TimeUnit.SECONDS;
-        private Action0 greetingAction = new Noop();
+        private Action greetingAction = new Noop();
         private Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
 
         public Builder(final WebSocketContainer container,
@@ -130,11 +128,11 @@ public class AutoReconnection implements Closeable {
                        final URI serverUri,
                        final Observer<ReplyMessage> replyPublisher) {
 
-            Preconditions.checkNotNull(container);
-            Preconditions.checkNotNull(clientEndpoint);
-            Preconditions.checkNotNull(clientConfig);
-            Preconditions.checkNotNull(serverUri);
-            Preconditions.checkNotNull(replyPublisher);
+            Objects.requireNonNull(container, "container");
+            Objects.requireNonNull(clientEndpoint, "clientEndpoint");
+            Objects.requireNonNull(clientConfig, "clientConfig");
+            Objects.requireNonNull(serverUri, "serverUri");
+            Objects.requireNonNull(replyPublisher, "replyPublisher");
 
             this.container = container;
             this.clientEndpoint = clientEndpoint;
@@ -144,44 +142,51 @@ public class AutoReconnection implements Closeable {
         }
 
         public Builder scheduler(Scheduler scheduler) {
-            Preconditions.checkNotNull(scheduler);
-            this.scheduler = scheduler;
+            this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
             return this;
         }
 
         public Builder delay(final long delay) {
-            Preconditions.checkArgument(delay >= 0);
+            checkArgument(delay >= 0, "delay must be non-negative");
             this.delay = delay;
             return this;
         }
 
         public Builder period(final long period) {
-            Preconditions.checkArgument(period >= 0);
+            checkArgument(period > 0, "period must be positive");
             this.period = period;
             return this;
         }
 
         public Builder timeUnit(final TimeUnit unit) {
-            Preconditions.checkNotNull(unit);
-            this.unit = unit;
+            this.unit = Objects.requireNonNull(unit, "unit");
             return this;
         }
 
-        public Builder greetingAction(final Action0 greetingAction) {
+        public Builder greetingAction(final Action greetingAction) {
             this.greetingAction = greetingAction != null ? greetingAction : new Noop();
             return this;
         }
 
-        public Builder timeUnit(final Observer<DiagnosticMessage> diagnosticPublisher) {
-            Preconditions.checkNotNull(diagnosticPublisher);
-            this.diagnosticPublisher = diagnosticPublisher;
+        public Builder diagnosticPublisher(final Observer<DiagnosticMessage> diagnosticPublisher) {
+            this.diagnosticPublisher = Objects.requireNonNull(diagnosticPublisher, "diagnosticPublisher");
             return this;
+        }
+
+        public AutoReconnection build() {
+            return new AutoReconnection(this);
+        }
+
+        private static void checkArgument(boolean expression, String message) {
+            if (!expression) {
+                throw new IllegalArgumentException(message);
+            }
         }
     }
 
-    private static final class Noop implements Action0 {
+    private static final class Noop implements Action {
         @Override
-        public void call() {
+        public void run() {
         }
     }
 }

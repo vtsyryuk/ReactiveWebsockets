@@ -1,11 +1,11 @@
 package wsx;
 
-import com.google.common.base.Preconditions;
-import rx.Observable;
-import rx.Observer;
-import rx.Scheduler;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.core.Scheduler;
 
 import javax.websocket.RemoteEndpoint.Async;
+import java.util.Objects;
 
 public final class ReplyMessageHandlerFactory implements MessageHandlerFactory<ReplyMessage> {
 
@@ -20,15 +20,10 @@ public final class ReplyMessageHandlerFactory implements MessageHandlerFactory<R
             final Observer<DiagnosticMessage> diagnosticPublisher,
             final Scheduler scheduler) {
 
-        Preconditions.checkNotNull(replyMessagePublisher);
-        Preconditions.checkNotNull(requestStream);
-        Preconditions.checkNotNull(diagnosticPublisher);
-        Preconditions.checkNotNull(scheduler);
-
-        this.replyMessagePublisher = replyMessagePublisher;
-        this.requestStream = requestStream;
-        this.diagnosticPublisher = diagnosticPublisher;
-        this.scheduler = scheduler;
+        this.replyMessagePublisher = Objects.requireNonNull(replyMessagePublisher, "replyMessagePublisher");
+        this.requestStream = Objects.requireNonNull(requestStream, "requestStream");
+        this.diagnosticPublisher = Objects.requireNonNull(diagnosticPublisher, "diagnosticPublisher");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override

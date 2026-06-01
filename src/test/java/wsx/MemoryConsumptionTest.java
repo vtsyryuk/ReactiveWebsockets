@@ -1,14 +1,14 @@
 package wsx;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import rx.Observer;
-import rx.Scheduler;
-import rx.schedulers.Schedulers;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.core.Scheduler;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
@@ -27,9 +27,9 @@ public final class MemoryConsumptionTest {
     private Session browserSession1;
     private Session webappSession;
 
-    @Before
+    @BeforeEach
     public void setUp() {
-        Scheduler scheduler = Schedulers.immediate();
+        Scheduler scheduler = Schedulers.trampoline();
         Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
         ReplyMessageService textMessageService = new ReplyMessageService();
 
@@ -97,8 +97,8 @@ public final class MemoryConsumptionTest {
         webappHandler = null;
         webappClient.onOpen(webappSession, endpointConfig);
 
-        Assert.assertNotNull(browserHandler1);
-        Assert.assertNotNull(webappHandler);
+        assertNotNull(browserHandler1);
+        assertNotNull(webappHandler);
 
         RequestMessage msgSub = new RequestMessage();
         MessageSubject subject = MessageSubjectFactory.create("Subject", "Subject1");

@@ -1,24 +1,21 @@
 package wsx;
 
-import com.google.common.base.Preconditions;
-import rx.Subscription;
-import rx.functions.Action0;
-import rx.subscriptions.Subscriptions;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Objects;
 
 public class SimpleSessionManager<T> implements SessionManager {
 
     private static final Object[] EMPTY_ARRAY = new Object[0];
-    private MessageHandlerFactory<T> messageHandlerFactory;
+    private final MessageHandlerFactory<T> messageHandlerFactory;
 
     public SimpleSessionManager(final MessageHandlerFactory<T> messageHandlerFactory) {
-        Preconditions.checkNotNull(messageHandlerFactory);
-        this.messageHandlerFactory = messageHandlerFactory;
+        this.messageHandlerFactory = Objects.requireNonNull(messageHandlerFactory, "messageHandlerFactory");
     }
 
     // NOTE: this workaround is because of the custom tomcat'c websocket implementation
@@ -38,33 +35,31 @@ public class SimpleSessionManager<T> implements SessionManager {
 
     @SuppressWarnings("resource")
     @Override
-    public Subscription attach(final Session session) {
+    public Disposable attach(final Session session) {
         final CloseableMessageHandler<T> handler = messageHandlerFactory.create(session.getAsyncRemote());
         session.addMessageHandler(handler);
         final MessageHandler registeredHandler = getRegisteredHandler(session, handler);
 
-        return Subscriptions.create(new Action0() {
-            @Override
-            public void call() {
-                tryCloseMessageHandler(handler);
-                tryRemoveMessageHandler(session, registeredHandler);
-            }
+        return Disposable.fromAction(() -> {
+            tryCloseMessageHandler(handler);
+            tryRemoveMessageHandler(session, registeredHandler);
 
-            private void tryCloseMessageHandler(final Closeable closeable) {
-                try {
-                    closeable.close();
-                } catch (IOException ignored) {
-                }
-            }
-
-            private void tryRemoveMessageHandler(final Session session, final MessageHandler registeredHandler) {
-                if (registeredHandler != null) {
-                    try {
-                        session.removeMessageHandler(registeredHandler);
-                    } catch (Exception ignored) {
-                    }
-                }
-            }
         });
+    }
+
+    private static void tryCloseMessageHandler(final Closeable closeable) {
+        try {
+            closeable.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static void tryRemoveMessageHandler(final Session session, final MessageHandler registeredHandler) {
+        if (registeredHandler != null) {
+            try {
+                session.removeMessageHandler(registeredHandler);
+            } catch (Exception ignored) {
+            }
+        }
     }
 }

@@ -1,19 +1,19 @@
 package wsx;
 
-import com.google.common.base.Preconditions;
-import rx.Observer;
-import rx.Scheduler;
-import rx.Subscription;
-import rx.functions.Action0;
-import rx.functions.Action1;
-import rx.subjects.PublishSubject;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.core.Scheduler;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.subjects.Subject;
+import io.reactivex.rxjava3.subjects.PublishSubject;
 
 import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.SendHandler;
 import javax.websocket.SendResult;
 import java.io.IOException;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class RequestMessageHandler implements CloseableMessageHandler<RequestMessage> {
 
@@ -21,34 +21,29 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
 
     private final Async clientEndpoint;
     private final Observer<DiagnosticMessage> diagnosticPublisher;
-    private final ConcurrentHashMap<MessageSubject, Subscription> subscriptions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<MessageSubject, Disposable> subscriptions = new ConcurrentHashMap<>();
     private final DataSource dataSource;
-    private final PublishSubject<RequestMessage> messageSubject = PublishSubject.create();
+    private final Subject<RequestMessage> messageSubject = PublishSubject.<RequestMessage>create().toSerialized();
 
-    private final Subscription handlerSubscription;
+    private final Disposable handlerDisposable;
 
     public RequestMessageHandler(final Async clientEndpoint,
                                  final DataSource dataSource,
                                  final Observer<DiagnosticMessage> diagnosticPublisher,
                                  final Scheduler scheduler) {
 
-        Preconditions.checkNotNull(clientEndpoint);
-        Preconditions.checkNotNull(dataSource);
-        Preconditions.checkNotNull(diagnosticPublisher);
-        Preconditions.checkNotNull(scheduler);
+        Objects.requireNonNull(clientEndpoint, "clientEndpoint");
+        Objects.requireNonNull(dataSource, "dataSource");
+        Objects.requireNonNull(diagnosticPublisher, "diagnosticPublisher");
+        Objects.requireNonNull(scheduler, "scheduler");
 
         this.clientEndpoint = clientEndpoint;
         this.dataSource = dataSource;
         this.diagnosticPublisher = diagnosticPublisher;
 
-        handlerSubscription = messageSubject
+        handlerDisposable = messageSubject
                 .observeOn(scheduler)
-                .subscribe(new Action1<RequestMessage>() {
-                    @Override
-                    public void call(RequestMessage m) {
-                        handleMessage(m);
-                    }
-                });
+                .subscribe(this::handleMessage);
     }
 
     protected static SendHandler createSendHandler(final MessageSubject subject,
@@ -62,20 +57,28 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
                     diagnosticSubject.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, message));
                 } else {
                     String message = String.format("Failed to send message to the %s subject due to: %s", subject,
-                            result.getException().getCause());
+                            sendFailure(result));
                     diagnosticSubject.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
                 }
             }
         };
     }
 
+    private static String sendFailure(SendResult result) {
+        Throwable exception = result.getException();
+        if (exception == null) {
+            return "unknown send failure";
+        }
+        return exception.getCause() != null ? exception.getCause().toString() : exception.toString();
+    }
+
     @Override
     public void close() throws IOException {
-        for (Entry<MessageSubject, Subscription> entry : subscriptions.entrySet()) {
-            entry.getValue().unsubscribe();
+        for (Entry<MessageSubject, Disposable> entry : subscriptions.entrySet()) {
+            entry.getValue().dispose();
         }
         subscriptions.clear();
-        handlerSubscription.unsubscribe();
+        handlerDisposable.dispose();
     }
 
     @Override
@@ -103,12 +106,12 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
         final String message = String.format("Failed to process %s command due to: %s", request.getContent(), e.getMessage());
         diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, message));
 
-        Reply(request.getSubject(), message);
+        reply(request.getSubject(), message);
     }
 
     private void handleUnknown(final RequestMessage request) {
         diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, UnableToParseCommand));
-        Reply(request.getSubject(), UnableToParseCommand);
+        reply(request.getSubject(), UnableToParseCommand);
     }
 
     private void handleSubscribe(final RequestMessage request) {
@@ -118,18 +121,26 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
             String message = String.format("Duplicate %s subscribe command has been ignored", subject);
             diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
         } else {
-            subscriptions.put(subject, createSubscription(subject));
-
-            String message = String.format("Subscribed to %s", subject);
-            diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.INFO, message));
+            AtomicBoolean created = new AtomicBoolean(false);
+            subscriptions.computeIfAbsent(subject, key -> {
+                created.set(true);
+                return createSubscription(key);
+            });
+            if (created.get()) {
+                String message = String.format("Subscribed to %s", subject);
+                diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.INFO, message));
+            } else {
+                String message = String.format("Duplicate %s subscribe command has been ignored", subject);
+                diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
+            }
         }
     }
 
     private void handleUnsubscribe(final RequestMessage request) {
         final MessageSubject subject = request.getSubject();
-        Subscription s = subscriptions.remove(subject);
+        Disposable s = subscriptions.remove(subject);
         if (s != null) {
-            s.unsubscribe();
+            s.dispose();
         } else {
             String message = String.format("Unable to find %s subscription", subject);
             diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
@@ -137,35 +148,24 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
     }
 
     @SuppressWarnings("synthetic-access")
-    private Subscription createSubscription(final MessageSubject subject) {
+    private Disposable createSubscription(final MessageSubject subject) {
         final SendHandler sendHandler = createSendHandler(subject, diagnosticPublisher);
 
-        final Action1<ReplyMessage> onNext = new Action1<ReplyMessage>() {
-            @Override
-            public void call(ReplyMessage message) {
-                String msg = String.format("sending reply: %s", message);
-                diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, msg));
-                clientEndpoint.sendObject(message, sendHandler);
-            }
+        var onNext = (io.reactivex.rxjava3.functions.Consumer<ReplyMessage>) message -> {
+            String msg = String.format("sending reply: %s", message);
+            diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, msg));
+            clientEndpoint.sendObject(message, sendHandler);
         };
-        final Action1<Throwable> onError = new Action1<Throwable>() {
-            @Override
-            public void call(Throwable t) {
+        var onError = (io.reactivex.rxjava3.functions.Consumer<Throwable>) t ->
                 diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, t.getMessage()));
-            }
-        };
-        final Action0 onComplete = new Action0() {
-            @Override
-            public void call() {
+        var onComplete = (io.reactivex.rxjava3.functions.Action) () ->
                 diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.INFO,
                         "The source sequence is completed"));
-            }
-        };
         return dataSource.getDataStream(subject)
                 .subscribe(onNext, onError, onComplete);
     }
 
-    private void Reply(final MessageSubject subject, final String content) {
+    private void reply(final MessageSubject subject, final String content) {
         final ReplyMessage response = ReplyMessage.create(subject, content);
         clientEndpoint.sendObject(response, createSendHandler(subject, diagnosticPublisher));
     }

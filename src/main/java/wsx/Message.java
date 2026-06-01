@@ -1,12 +1,12 @@
 package wsx;
 
-import org.joda.time.DateTime;
+import java.time.Instant;
 
 public class Message<T> {
 
     private T content;
     private MessageSubject subject;
-    private DateTime timestamp;
+    private Instant timestamp;
 
     public T getContent() {
         return content;
@@ -24,11 +24,11 @@ public class Message<T> {
         this.subject = subject;
     }
 
-    public DateTime getTimestamp() {
+    public Instant getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(DateTime timestamp) {
+    public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;
     }
 

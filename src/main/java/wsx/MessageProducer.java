@@ -1,6 +1,6 @@
 package wsx;
 
-import rx.Observer;
+import io.reactivex.rxjava3.core.Observer;
 
 public interface MessageProducer<T> {
 

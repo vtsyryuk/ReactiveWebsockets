@@ -1,23 +1,23 @@
 package wsx;
 
-import com.google.common.base.Preconditions;
-import rx.Observable;
-import rx.Observer;
-import rx.Scheduler;
-import rx.Subscription;
-import rx.functions.Action1;
-import rx.subjects.PublishSubject;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.core.Scheduler;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
 import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.SendHandler;
 import javax.websocket.SendResult;
 import java.io.IOException;
+import java.util.Objects;
 
 public class ReplyMessageHandler implements CloseableMessageHandler<ReplyMessage> {
 
-    private final Subscription requestStreamSubscription;
-    private final PublishSubject<ReplyMessage> replySubject = PublishSubject.create();
-    private final Subscription replyStreamSubscription;
+    private final Disposable requestStreamDisposable;
+    private final Subject<ReplyMessage> replySubject = PublishSubject.<ReplyMessage>create().toSerialized();
+    private final Disposable replyStreamDisposable;
 
     public ReplyMessageHandler(final Async serverEndpoint,
                                final Observable<RequestMessage> requestStream,
@@ -25,24 +25,23 @@ public class ReplyMessageHandler implements CloseableMessageHandler<ReplyMessage
                                final Observer<DiagnosticMessage> diagnosticPublisher,
                                final Scheduler scheduler) {
 
-        Preconditions.checkNotNull(serverEndpoint);
-        Preconditions.checkNotNull(requestStream);
-        Preconditions.checkNotNull(replyMessagePublisher);
-        Preconditions.checkNotNull(diagnosticPublisher);
-        Preconditions.checkNotNull(scheduler);
+        Objects.requireNonNull(serverEndpoint, "serverEndpoint");
+        Objects.requireNonNull(requestStream, "requestStream");
+        Objects.requireNonNull(replyMessagePublisher, "replyMessagePublisher");
+        Objects.requireNonNull(diagnosticPublisher, "diagnosticPublisher");
+        Objects.requireNonNull(scheduler, "scheduler");
 
 
-        replyStreamSubscription = replySubject
+        replyStreamDisposable = replySubject
                 .observeOn(scheduler)
-                .subscribe(replyMessagePublisher);
+                .subscribe(
+                        replyMessagePublisher::onNext,
+                        replyMessagePublisher::onError,
+                        replyMessagePublisher::onComplete);
 
-        this.requestStreamSubscription = requestStream.subscribe(new Action1<RequestMessage>() {
-            @SuppressWarnings("synthetic-access")
-            @Override
-            public void call(RequestMessage msg) {
-                final MessageSubject subject = msg.getSubject();
-                serverEndpoint.sendObject(msg, createHandler(subject, diagnosticPublisher));
-            }
+        this.requestStreamDisposable = requestStream.subscribe(msg -> {
+            final MessageSubject subject = msg.getSubject();
+            serverEndpoint.sendObject(msg, createHandler(subject, diagnosticPublisher));
         });
     }
 
@@ -56,17 +55,25 @@ public class ReplyMessageHandler implements CloseableMessageHandler<ReplyMessage
                     diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, message));
                 } else {
                     String message = String.format("Failed to publish a request message to the %s subject due to: %s", subject,
-                            result.getException().getCause());
+                            sendFailure(result));
                     diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
                 }
             }
         };
     }
 
+    private static String sendFailure(SendResult result) {
+        Throwable exception = result.getException();
+        if (exception == null) {
+            return "unknown send failure";
+        }
+        return exception.getCause() != null ? exception.getCause().toString() : exception.toString();
+    }
+
     @Override
     public void close() throws IOException {
-        requestStreamSubscription.unsubscribe();
-        replyStreamSubscription.unsubscribe();
+        requestStreamDisposable.dispose();
+        replyStreamDisposable.dispose();
     }
 
     @Override

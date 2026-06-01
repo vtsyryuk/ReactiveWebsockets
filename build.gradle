@@ -1,0 +1,77 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+group = 'vt.reactivews'
+version = '1.0.0'
+description = 'Reactive websocket subscription routing for Java.'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+dependencies {
+    api 'io.reactivex.rxjava3:rxjava:3.1.12'
+    api 'com.google.code.gson:gson:2.13.2'
+
+    compileOnly 'javax:javaee-api:7.0'
+    compileOnly 'org.springframework:spring-context:7.0.7'
+
+    testImplementation 'javax:javaee-api:7.0'
+    testImplementation 'org.springframework:spring-context:7.0.7'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.1.0'
+    testImplementation 'org.mockito:mockito-core:5.23.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            pom {
+                name = 'ReactiveWebsockets'
+                description = project.description
+                url = 'https://github.com/vtsyryuk/ReactiveWebsockets'
+                licenses {
+                    license {
+                        name = 'The BSD 3-Clause License'
+                        url = 'https://opensource.org/license/BSD-3-Clause'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/vtsyryuk/ReactiveWebsockets.git'
+                    developerConnection = 'scm:git:https://github.com/vtsyryuk/ReactiveWebsockets.git'
+                    url = 'https://github.com/vtsyryuk/ReactiveWebsockets'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'GitHubPackages'
+            url = uri('https://maven.pkg.github.com/vtsyryuk/ReactiveWebsockets')
+            credentials {
+                username = findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+                password = findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')
+            }
+        }
+    }
+}

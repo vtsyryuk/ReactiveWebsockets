@@ -1,13 +1,18 @@
 package wsx;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import rx.functions.Action1;
-import rx.subjects.PublishSubject;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.subjects.PublishSubject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("synthetic-access")
 public final class SubscriptionRouterTest {
@@ -16,43 +21,33 @@ public final class SubscriptionRouterTest {
     private PublishSubject<ReplyMessage> textStream;
     private List<RequestMessage> requests;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         textStream = PublishSubject.create();
         router = new SubscriptionRouter(textStream);
         requests = new ArrayList<>();
-        router.getRequestStream().subscribe(new Action1<RequestMessage>() {
-            @Override
-            public void call(RequestMessage t1) {
-                requests.add(t1);
-            }
-        });
+        router.getRequestStream().subscribe(requests::add);
     }
 
     @Test
     public void subscriptionTest() {
         final List<ReplyMessage> txtMsgs = new ArrayList<>();
         MessageSubject key = MessageSubjectFactory.create("Subject", "Subject1");
-        rx.Subscription s1 = router.getDataStream(key).subscribe(new Action1<ReplyMessage>() {
-            @Override
-            public void call(ReplyMessage t1) {
-                txtMsgs.add(t1);
-            }
-        });
-        Assert.assertEquals(1, requests.size());
-        Assert.assertTrue(requests.get(0).getContent() == RequestMessageType.Subscribe);
-        Assert.assertTrue(requests.get(0).getSubject() == key);
+        Disposable s1 = router.getDataStream(key).subscribe(txtMsgs::add);
+        assertEquals(1, requests.size());
+        assertTrue(requests.get(0).getContent() == RequestMessageType.Subscribe);
+        assertTrue(requests.get(0).getSubject() == key);
         String content = "Content1";
         ReplyMessage txtMsg1 = ReplyMessage.create(key, content);
         textStream.onNext(txtMsg1);
-        Assert.assertEquals(1, txtMsgs.size());
+        assertEquals(1, txtMsgs.size());
 
-        s1.unsubscribe();
-        Assert.assertEquals(2, requests.size());
-        Assert.assertTrue(requests.get(1).getContent() == RequestMessageType.Unsubscribe);
-        Assert.assertTrue(requests.get(1).getSubject() == key);
+        s1.dispose();
+        assertEquals(2, requests.size());
+        assertTrue(requests.get(1).getContent() == RequestMessageType.Unsubscribe);
+        assertTrue(requests.get(1).getSubject() == key);
         textStream.onNext(txtMsg1);
-        Assert.assertEquals(1, txtMsgs.size());
+        assertEquals(1, txtMsgs.size());
     }
 
     @Test
@@ -60,37 +55,42 @@ public final class SubscriptionRouterTest {
         final List<ReplyMessage> txtMsgs1 = new ArrayList<>();
         final List<ReplyMessage> txtMsgs2 = new ArrayList<>();
         MessageSubject key = MessageSubjectFactory.create("Subject", "Subject1");
-        rx.Subscription s1 = router.getDataStream(key).subscribe(new Action1<ReplyMessage>() {
-            @Override
-            public void call(ReplyMessage t1) {
-                txtMsgs1.add(t1);
-            }
-        });
-        rx.Subscription s2 = router.getDataStream(key).subscribe(new Action1<ReplyMessage>() {
-            @Override
-            public void call(ReplyMessage t1) {
-                txtMsgs2.add(t1);
-            }
-        });
-        Assert.assertEquals(1, requests.size());
-        Assert.assertTrue(requests.get(0).getContent() == RequestMessageType.Subscribe);
-        Assert.assertTrue(requests.get(0).getSubject() == key);
+        Disposable s1 = router.getDataStream(key).subscribe(txtMsgs1::add);
+        Disposable s2 = router.getDataStream(key).subscribe(txtMsgs2::add);
+        assertEquals(1, requests.size());
+        assertTrue(requests.get(0).getContent() == RequestMessageType.Subscribe);
+        assertTrue(requests.get(0).getSubject() == key);
         String content = "Content1";
         ReplyMessage txtMsg1 = ReplyMessage.create(key, content);
         textStream.onNext(txtMsg1);
-        Assert.assertEquals(1, txtMsgs1.size());
-        Assert.assertEquals(1, txtMsgs2.size());
+        assertEquals(1, txtMsgs1.size());
+        assertEquals(1, txtMsgs2.size());
         textStream.onNext(txtMsg1);
-        Assert.assertEquals(2, txtMsgs1.size());
-        Assert.assertEquals(2, txtMsgs2.size());
-        s1.unsubscribe();
-        Assert.assertEquals(1, requests.size());
+        assertEquals(2, txtMsgs1.size());
+        assertEquals(2, txtMsgs2.size());
+        s1.dispose();
+        assertEquals(1, requests.size());
         textStream.onNext(txtMsg1);
-        Assert.assertEquals(2, txtMsgs1.size());
-        Assert.assertEquals(3, txtMsgs2.size());
-        s2.unsubscribe();
-        Assert.assertEquals(2, requests.size());
-        Assert.assertTrue(requests.get(1).getContent() == RequestMessageType.Unsubscribe);
-        Assert.assertTrue(requests.get(1).getSubject() == key);
+        assertEquals(2, txtMsgs1.size());
+        assertEquals(3, txtMsgs2.size());
+        s2.dispose();
+        assertEquals(2, requests.size());
+        assertTrue(requests.get(1).getContent() == RequestMessageType.Unsubscribe);
+        assertTrue(requests.get(1).getSubject() == key);
+    }
+
+    @Test
+    public void concurrentGetDataStreamReturnsSingleSharedStream() throws InterruptedException {
+        MessageSubject key = MessageSubjectFactory.create("Subject", "Subject1");
+        Set<Integer> streamIdentities = ConcurrentHashMap.newKeySet();
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+
+        for (int i = 0; i < 100; i++) {
+            executor.submit(() -> streamIdentities.add(System.identityHashCode(router.getDataStream(key))));
+        }
+
+        executor.shutdown();
+        assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        assertEquals(1, streamIdentities.size());
     }
 }

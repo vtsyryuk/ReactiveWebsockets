@@ -1,10 +1,6 @@
 package wsx;
 
-import org.apache.commons.lang3.tuple.Pair;
-
-public final class DiagnosticMessage extends Pair<DiagnosticLevel, String> {
-
-    private static final long serialVersionUID = 39629977985014918L;
+public final class DiagnosticMessage {
 
     private final DiagnosticLevel level;
     private final String message;
@@ -14,18 +10,24 @@ public final class DiagnosticMessage extends Pair<DiagnosticLevel, String> {
         this.message = message;
     }
 
-    @Override
+    public DiagnosticLevel getLevel() {
+        return level;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
     public DiagnosticLevel getLeft() {
         return level;
     }
 
-    @Override
     public String getRight() {
         return message;
     }
 
     @Override
-    public String setValue(String value) {
-        return null;
+    public String toString() {
+        return "DiagnosticMessage [level=" + level + ", message=" + message + "]";
     }
 }

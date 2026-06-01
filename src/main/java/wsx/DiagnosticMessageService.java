@@ -1,14 +1,15 @@
 package wsx;
 
 import org.springframework.stereotype.Component;
-import rx.Observable;
-import rx.Observer;
-import rx.subjects.PublishSubject;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
 @Component
 public final class DiagnosticMessageService implements MessageConsumer<DiagnosticMessage>, MessageProducer<DiagnosticMessage> {
 
-    private final PublishSubject<DiagnosticMessage> subject = PublishSubject.create();
+    private final Subject<DiagnosticMessage> subject = PublishSubject.<DiagnosticMessage>create().toSerialized();
 
     @Override
     public Observer<DiagnosticMessage> getPublisher() {
@@ -17,6 +18,6 @@ public final class DiagnosticMessageService implements MessageConsumer<Diagnosti
 
     @Override
     public Observable<DiagnosticMessage> getStream() {
-        return subject.asObservable();
+        return subject.hide();
     }
 }
