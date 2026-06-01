@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'vt.reactivews'
-version = '1.0.0'
+version = '2.0.0'
 description = 'Reactive websocket subscription routing for Java.'
 
 java {
