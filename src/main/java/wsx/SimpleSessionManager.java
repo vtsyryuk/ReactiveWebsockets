@@ -9,11 +9,21 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Objects;
 
+/**
+ * Session manager that attaches one message handler to each websocket session.
+ *
+ * @param <T> message type handled by sessions managed by this instance
+ */
 public class SimpleSessionManager<T> implements SessionManager {
 
     private static final Object[] EMPTY_ARRAY = new Object[0];
     private final MessageHandlerFactory<T> messageHandlerFactory;
 
+    /**
+     * Creates a session manager that obtains handlers from the supplied factory.
+     *
+     * @param messageHandlerFactory factory used to create per-session handlers
+     */
     public SimpleSessionManager(final MessageHandlerFactory<T> messageHandlerFactory) {
         this.messageHandlerFactory = Objects.requireNonNull(messageHandlerFactory, "messageHandlerFactory");
     }
@@ -33,6 +43,12 @@ public class SimpleSessionManager<T> implements SessionManager {
         return handler;
     }
 
+    /**
+     * Attaches a handler to the session and returns cleanup logic for removal and close.
+     *
+     * @param session websocket session to attach to
+     * @return disposable that detaches and closes the handler
+     */
     @SuppressWarnings("resource")
     @Override
     public Disposable attach(final Session session) {

@@ -10,6 +10,11 @@ import java.io.IOException;
 import java.io.Writer;
 import java.time.Instant;
 
+/**
+ * Gson-backed websocket text encoder for {@link Message} subclasses.
+ *
+ * @param <M> message type to encode
+ */
 public class MessageEncoder<M extends Message<?>> implements Encoder.TextStream<M> {
 
     private static final Gson gson = new GsonBuilder()
@@ -26,6 +31,14 @@ public class MessageEncoder<M extends Message<?>> implements Encoder.TextStream<
     public void destroy() {
     }
 
+    /**
+     * Encodes a message as JSON using the concrete message class.
+     *
+     * @param message message to encode
+     * @param writer destination writer supplied by the websocket runtime
+     * @throws EncodeException if the websocket runtime cannot encode the message
+     * @throws IOException if writing the JSON fails
+     */
     @Override
     public void encode(M message, Writer writer) throws EncodeException, IOException {
         gson.toJson(message, message.getClass(), writer);

@@ -16,6 +16,9 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Maintains a client websocket connection and retries connection attempts after closures.
+ */
 @SuppressWarnings("synthetic-access")
 public class AutoReconnection implements Closeable {
 
@@ -85,6 +88,11 @@ public class AutoReconnection implements Closeable {
                 .subscribe();
     }
 
+    /**
+     * Stops reconnect attempts and closes the active server session when present.
+     *
+     * @throws IOException if the underlying websocket session cannot be closed
+     */
     @Override
     public synchronized void close() throws IOException {
         try {
@@ -106,6 +114,9 @@ public class AutoReconnection implements Closeable {
         }
     }
 
+    /**
+     * Builder for configuring automatic websocket reconnection behavior.
+     */
     public static class Builder {
         // Required parameters
         private final WebSocketContainer container;
@@ -122,6 +133,15 @@ public class AutoReconnection implements Closeable {
         private Action greetingAction = new Noop();
         private Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
 
+        /**
+         * Creates a builder with the required connection dependencies.
+         *
+         * @param container websocket container used to connect to the server
+         * @param clientEndpoint endpoint instance attached to the connection
+         * @param clientConfig client endpoint configuration
+         * @param serverUri target server URI
+         * @param replyPublisher publisher that receives connection status replies
+         */
         public Builder(final WebSocketContainer container,
                        final SocketEndpoint clientEndpoint,
                        final ClientEndpointConfig clientConfig,
@@ -141,38 +161,79 @@ public class AutoReconnection implements Closeable {
             this.replyPublisher = replyPublisher;
         }
 
+        /**
+         * Sets the scheduler used for reconnect polling.
+         *
+         * @param scheduler RxJava scheduler for reconnect attempts
+         * @return this builder
+         */
         public Builder scheduler(Scheduler scheduler) {
             this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
             return this;
         }
 
+        /**
+         * Sets the initial reconnect delay.
+         *
+         * @param delay delay before the first reconnect attempt
+         * @return this builder
+         */
         public Builder delay(final long delay) {
             checkArgument(delay >= 0, "delay must be non-negative");
             this.delay = delay;
             return this;
         }
 
+        /**
+         * Sets the interval between reconnect attempts.
+         *
+         * @param period reconnect period
+         * @return this builder
+         */
         public Builder period(final long period) {
             checkArgument(period > 0, "period must be positive");
             this.period = period;
             return this;
         }
 
+        /**
+         * Sets the time unit used by delay and period.
+         *
+         * @param unit reconnect timing unit
+         * @return this builder
+         */
         public Builder timeUnit(final TimeUnit unit) {
             this.unit = Objects.requireNonNull(unit, "unit");
             return this;
         }
 
+        /**
+         * Sets an action invoked after a successful reconnect.
+         *
+         * @param greetingAction action to run after connection
+         * @return this builder
+         */
         public Builder greetingAction(final Action greetingAction) {
             this.greetingAction = greetingAction != null ? greetingAction : new Noop();
             return this;
         }
 
+        /**
+         * Sets the diagnostic publisher used for reconnect failures and close errors.
+         *
+         * @param diagnosticPublisher diagnostic message publisher
+         * @return this builder
+         */
         public Builder diagnosticPublisher(final Observer<DiagnosticMessage> diagnosticPublisher) {
             this.diagnosticPublisher = Objects.requireNonNull(diagnosticPublisher, "diagnosticPublisher");
             return this;
         }
 
+        /**
+         * Creates and starts the auto-reconnection controller.
+         *
+         * @return configured auto-reconnection instance
+         */
         public AutoReconnection build() {
             return new AutoReconnection(this);
         }

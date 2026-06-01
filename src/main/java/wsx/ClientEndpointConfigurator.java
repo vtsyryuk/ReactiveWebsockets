@@ -7,6 +7,9 @@ import javax.websocket.HandshakeResponse;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Client endpoint configurator hook for websocket handshake customization.
+ */
 @Component
 public final class ClientEndpointConfigurator extends ClientEndpointConfig.Configurator {
 
@@ -19,6 +22,7 @@ public final class ClientEndpointConfigurator extends ClientEndpointConfig.Confi
      * @param headers the mutable map of handshake request headers the implementation is about to send to
      *                start the handshake interaction.
      */
+    @Override
     public void beforeRequest(Map<String, List<String>> headers) {
         super.beforeRequest(headers);
     }
@@ -30,6 +34,7 @@ public final class ClientEndpointConfigurator extends ClientEndpointConfig.Confi
      *
      * @param hr the handshake response sent by the server.
      */
+    @Override
     public void afterResponse(HandshakeResponse hr) {
         super.afterResponse(hr);
     }

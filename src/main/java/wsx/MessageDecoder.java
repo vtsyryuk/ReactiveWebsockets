@@ -10,6 +10,11 @@ import java.io.IOException;
 import java.io.Reader;
 import java.time.Instant;
 
+/**
+ * Gson-backed websocket text decoder for {@link Message} subclasses.
+ *
+ * @param <M> message type to decode
+ */
 public abstract class MessageDecoder<M extends Message<?>> implements Decoder.TextStream<M> {
 
     private static final Gson gson = new GsonBuilder()
@@ -26,10 +31,23 @@ public abstract class MessageDecoder<M extends Message<?>> implements Decoder.Te
     public void destroy() {
     }
 
+    /**
+     * Decodes JSON from the websocket stream into the configured message class.
+     *
+     * @param reader source reader supplied by the websocket runtime
+     * @return decoded message
+     * @throws DecodeException if the websocket runtime cannot decode the message
+     * @throws IOException if reading the JSON fails
+     */
     @Override
     public M decode(Reader reader) throws DecodeException, IOException {
         return gson.fromJson(reader, messageClass());
     }
 
+    /**
+     * Returns the concrete message class used by Gson during decoding.
+     *
+     * @return message class
+     */
     protected abstract Class<M> messageClass();
 }

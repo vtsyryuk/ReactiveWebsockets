@@ -15,6 +15,9 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Handles subscribe and unsubscribe requests by managing data-source subscriptions.
+ */
 public final class RequestMessageHandler implements CloseableMessageHandler<RequestMessage> {
 
     private static final String UnableToParseCommand = "Unable to parse a command";
@@ -27,6 +30,14 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
 
     private final Disposable handlerDisposable;
 
+    /**
+     * Creates a request message handler.
+     *
+     * @param clientEndpoint remote endpoint used to send reply messages
+     * @param dataSource data source used to resolve subscribed subjects
+     * @param diagnosticPublisher publisher for diagnostics
+     * @param scheduler scheduler used for request processing
+     */
     public RequestMessageHandler(final Async clientEndpoint,
                                  final DataSource dataSource,
                                  final Observer<DiagnosticMessage> diagnosticPublisher,
@@ -46,6 +57,13 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
                 .subscribe(this::handleMessage);
     }
 
+    /**
+     * Creates a websocket send callback that emits diagnostic messages for the result.
+     *
+     * @param subject subject being sent
+     * @param diagnosticSubject publisher for send diagnostics
+     * @return send result handler
+     */
     protected static SendHandler createSendHandler(final MessageSubject subject,
                                                    final Observer<DiagnosticMessage> diagnosticSubject) {
         return new SendHandler() {
@@ -72,6 +90,11 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
         return exception.getCause() != null ? exception.getCause().toString() : exception.toString();
     }
 
+    /**
+     * Disposes all active subscriptions and stops request processing.
+     *
+     * @throws IOException never thrown by the current implementation
+     */
     @Override
     public void close() throws IOException {
         for (Entry<MessageSubject, Disposable> entry : subscriptions.entrySet()) {
@@ -81,11 +104,21 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
         handlerDisposable.dispose();
     }
 
+    /**
+     * Queues an inbound request for scheduled processing.
+     *
+     * @param request inbound request message
+     */
     @Override
     public void onMessage(final RequestMessage request) {
         messageSubject.onNext(request);
     }
 
+    /**
+     * Processes a request message and dispatches it to the matching command handler.
+     *
+     * @param request request to process
+     */
     protected void handleMessage(final RequestMessage request) {
         String msg = String.format("Got request: %s", request);
         diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, msg));

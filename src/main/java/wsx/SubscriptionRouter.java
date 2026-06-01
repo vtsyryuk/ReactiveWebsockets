@@ -12,6 +12,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Routes reply messages by subject and emits subscription requests for new streams.
+ */
 @Component
 public class SubscriptionRouter implements DataSource {
 
@@ -19,6 +22,11 @@ public class SubscriptionRouter implements DataSource {
     private final Observable<ReplyMessage> replyStream;
     private final Map<MessageSubject, Observable<ReplyMessage>> replyStreams;
 
+    /**
+     * Creates a router over a shared reply stream.
+     *
+     * @param replyStream stream of all reply messages received from the websocket
+     */
     @Autowired
     public SubscriptionRouter(Observable<ReplyMessage> replyStream) {
         this.requestStream = PublishSubject.<RequestMessage>create().toSerialized();
@@ -26,15 +34,29 @@ public class SubscriptionRouter implements DataSource {
         this.replyStream = replyStream;
     }
 
+    /**
+     * Returns a cached stream for the supplied subject, creating one on first use.
+     *
+     * @param subject subject to subscribe to
+     * @return reply stream for the subject
+     */
     @Override
     public Observable<ReplyMessage> getDataStream(final MessageSubject subject) {
         return replyStreams.computeIfAbsent(subject, this::createStream);
     }
 
+    /**
+     * Returns the outbound request stream produced by subject subscriptions.
+     *
+     * @return request stream
+     */
     public Observable<RequestMessage> getRequestStream() {
         return requestStream.hide();
     }
 
+    /**
+     * Re-emits subscribe requests for all currently tracked subjects.
+     */
     public void reSendSubscribeRequests() {
         for (Entry<MessageSubject, Observable<ReplyMessage>> item : replyStreams.entrySet()) {
             generateRequest(RequestMessageType.Subscribe, item.getKey());
