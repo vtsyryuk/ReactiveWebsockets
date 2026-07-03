@@ -32,8 +32,9 @@ Last updated from `master` at 2026-07-03 04:38 UTC for commit `a55cd44`.
 ## Requirements
 
 - Java 25
-- Gradle 9.4+
+- Gradle Wrapper 9.6.1
 - RxJava 3
+- JUnit 6 and Mockito 5 for tests
 
 ## Build
 
