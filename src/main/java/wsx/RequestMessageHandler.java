@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class RequestMessageHandler implements CloseableMessageHandler<RequestMessage> {
 
-    private static final String UnableToParseCommand = "Unable to parse a command";
+    private static final String UNABLE_TO_PARSE_COMMAND = "Unable to parse a command";
 
     private final Async clientEndpoint;
     private final Observer<DiagnosticMessage> diagnosticPublisher;
@@ -66,18 +66,14 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
      */
     protected static SendHandler createSendHandler(final MessageSubject subject,
                                                    final Observer<DiagnosticMessage> diagnosticSubject) {
-        return new SendHandler() {
-
-            @Override
-            public void onResult(SendResult result) {
-                if (result.isOK()) {
-                    String message = String.format("Successfully sent message to the %s subject", subject);
-                    diagnosticSubject.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, message));
-                } else {
-                    String message = String.format("Failed to send message to the %s subject due to: %s", subject,
-                            sendFailure(result));
-                    diagnosticSubject.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
-                }
+        return result -> {
+            if (result.isOK()) {
+                String message = String.format("Successfully sent message to the %s subject", subject);
+                diagnosticSubject.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, message));
+            } else {
+                String message = String.format("Failed to send message to the %s subject due to: %s", subject,
+                        sendFailure(result));
+                diagnosticSubject.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
             }
         };
     }
@@ -143,8 +139,8 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
     }
 
     private void handleUnknown(final RequestMessage request) {
-        diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, UnableToParseCommand));
-        reply(request.getSubject(), UnableToParseCommand);
+        diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, UNABLE_TO_PARSE_COMMAND));
+        reply(request.getSubject(), UNABLE_TO_PARSE_COMMAND);
     }
 
     private void handleSubscribe(final RequestMessage request) {

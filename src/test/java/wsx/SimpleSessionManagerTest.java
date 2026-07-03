@@ -14,15 +14,15 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public final class SimpleSessionManagerTest {
+final class SimpleSessionManagerTest {
 
     @Test
-    public void constructorRejectsNullFactory() {
+    void constructorRejectsNullFactory() {
         assertThrows(NullPointerException.class, () -> new SimpleSessionManager<>(null));
     }
 
     @Test
-    public void disposeClosesHandlerAndRemovesWrappedHandler() {
+    void disposeClosesHandlerAndRemovesWrappedHandler() {
         Session session = Mockito.mock(Session.class);
         Async remote = Mockito.mock(Async.class);
         TestMessageHandler handler = new TestMessageHandler();
@@ -41,7 +41,7 @@ public final class SimpleSessionManagerTest {
     }
 
     @Test
-    public void disposeFallsBackToOriginalHandlerWhenNoWrapperExists() {
+    void disposeFallsBackToOriginalHandlerWhenNoWrapperExists() {
         Session session = Mockito.mock(Session.class);
         Async remote = Mockito.mock(Async.class);
         TestMessageHandler handler = new TestMessageHandler();
@@ -57,7 +57,7 @@ public final class SimpleSessionManagerTest {
     }
 
     @Test
-    public void disposeIgnoresCloseAndRemoveFailures() {
+    void disposeIgnoresCloseAndRemoveFailures() {
         Session session = Mockito.mock(Session.class);
         Async remote = Mockito.mock(Async.class);
         ThrowingCloseHandler handler = new ThrowingCloseHandler();
@@ -82,10 +82,11 @@ public final class SimpleSessionManagerTest {
 
         @Override
         public void onMessage(String message) {
+            // Test handler records close behavior only.
         }
     }
 
-    public static final class WrappedHandler implements MessageHandler {
+    static final class WrappedHandler implements MessageHandler {
         private final MessageHandler wrappedHandler;
 
         private WrappedHandler(MessageHandler wrappedHandler) {
@@ -108,10 +109,11 @@ public final class SimpleSessionManagerTest {
 
         @Override
         public void onMessage(String message) {
+            // Test handler records close behavior only.
         }
     }
 
-    public static final class ThrowingWrappedHandler implements MessageHandler {
+    static final class ThrowingWrappedHandler implements MessageHandler {
         public MessageHandler getWrappedHandler() {
             throw new IllegalStateException("wrapper failed");
         }

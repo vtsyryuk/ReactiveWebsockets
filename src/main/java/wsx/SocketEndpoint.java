@@ -53,6 +53,7 @@ public final class SocketEndpoint extends Endpoint {
      * @param session closed websocket session
      * @param closeReason reason reported by the websocket runtime
      */
+    @Override
     @OnClose
     public void onClose(Session session, CloseReason closeReason) {
         final Disposable s = subscriptions.remove(session.getId());
@@ -70,6 +71,7 @@ public final class SocketEndpoint extends Endpoint {
      * @param session session associated with the error
      * @param thr error reported by the websocket runtime
      */
+    @Override
     @OnError
     public void onError(Session session, Throwable thr) {
         final DiagnosticMessage message = new DiagnosticMessage(DiagnosticLevel.ERROR, thr.getMessage());

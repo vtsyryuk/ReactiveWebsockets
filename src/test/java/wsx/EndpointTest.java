@@ -17,14 +17,14 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public final class EndpointTest {
+final class EndpointTest {
 
     private List<DiagnosticMessage> diagnosticMessages;
     private SessionManager manager;
     private SocketEndpoint endpoint;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         diagnosticMessages = new ArrayList<>();
         manager = Mockito.mock(SessionManager.class);
         PublishSubject<DiagnosticMessage> diagnosticService = PublishSubject.create();
@@ -33,11 +33,12 @@ public final class EndpointTest {
     }
 
     @AfterEach
-    public void teardown() {
+    void teardown() {
+        diagnosticMessages.clear();
     }
 
     @Test
-    public void onOpenTest() throws IOException {
+    void onOpenTest() throws IOException {
         try (Session session1 = Mockito.mock(Session.class)) {
             Mockito.when(session1.getId()).thenReturn("1");
             Mockito.when(manager.attach(session1)).thenReturn(Disposable.empty());
@@ -53,7 +54,7 @@ public final class EndpointTest {
     }
 
     @Test
-    public void onErrorTest() throws IOException {
+    void onErrorTest() throws IOException {
         try (Session session1 = Mockito.mock(Session.class)) {
             Mockito.when(session1.getId()).thenReturn("1");
             Mockito.when(manager.attach(session1)).thenReturn(Disposable.empty());
@@ -64,7 +65,7 @@ public final class EndpointTest {
     }
 
     @Test
-    public void onCloseTest() throws IOException {
+    void onCloseTest() throws IOException {
         try (Session session1 = Mockito.mock(Session.class)) {
             Mockito.when(session1.getId()).thenReturn("1");
             final boolean[] sessionClosed = {false};

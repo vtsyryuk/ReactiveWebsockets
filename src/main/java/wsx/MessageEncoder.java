@@ -25,10 +25,12 @@ public class MessageEncoder<M extends Message<?>> implements Encoder.TextStream<
 
     @Override
     public void init(EndpointConfig config) {
+        // No encoder state is initialized by this stateless Gson adapter.
     }
 
     @Override
     public void destroy() {
+        // No encoder resources are allocated by this stateless Gson adapter.
     }
 
     /**

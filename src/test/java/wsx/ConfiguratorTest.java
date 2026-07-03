@@ -14,14 +14,15 @@ import javax.websocket.server.ServerEndpointConfig;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public final class ConfiguratorTest {
+final class ConfiguratorTest {
 
     @Test
-    public void serverConfiguratorStoresHttpSessionDuringHandshake() {
+    void serverConfiguratorStoresHttpSessionDuringHandshake() {
         SocketEndpoint endpoint = new SocketEndpoint(Mockito.mock(SessionManager.class), PublishSubject.create());
         ServerEndpointConfigurator configurator = new ServerEndpointConfigurator(endpoint);
         ServerEndpointConfig config = Mockito.mock(ServerEndpointConfig.class);
@@ -39,15 +40,15 @@ public final class ConfiguratorTest {
     }
 
     @Test
-    public void serverConfiguratorReturnsInjectedSocketEndpoint() throws InstantiationException {
+    void serverConfiguratorReturnsInjectedSocketEndpoint() {
         SocketEndpoint endpoint = new SocketEndpoint(Mockito.mock(SessionManager.class), PublishSubject.create());
         ServerEndpointConfigurator configurator = new ServerEndpointConfigurator(endpoint);
 
-        assertSame(endpoint, configurator.getEndpointInstance(SocketEndpoint.class));
+        assertSame(endpoint, assertDoesNotThrow(() -> configurator.getEndpointInstance(SocketEndpoint.class)));
     }
 
     @Test
-    public void serverConfiguratorIgnoresMissingHttpSession() {
+    void serverConfiguratorIgnoresMissingHttpSession() {
         SocketEndpoint endpoint = new SocketEndpoint(Mockito.mock(SessionManager.class), PublishSubject.create());
         ServerEndpointConfigurator configurator = new ServerEndpointConfigurator(endpoint);
         ServerEndpointConfig config = Mockito.mock(ServerEndpointConfig.class);
@@ -63,7 +64,7 @@ public final class ConfiguratorTest {
     }
 
     @Test
-    public void serverConfiguratorDelegatesOtherEndpointTypes() throws InstantiationException {
+    void serverConfiguratorDelegatesOtherEndpointTypes() {
         SocketEndpoint endpoint = new SocketEndpoint(Mockito.mock(SessionManager.class), PublishSubject.create());
         ServerEndpointConfigurator configurator = new ServerEndpointConfigurator(endpoint);
 
@@ -71,7 +72,7 @@ public final class ConfiguratorTest {
     }
 
     @Test
-    public void clientConfiguratorAcceptsDefaultHandshakeHooks() {
+    void clientConfiguratorAcceptsDefaultHandshakeHooks() {
         ClientEndpointConfigurator configurator = new ClientEndpointConfigurator();
 
         configurator.beforeRequest(new HashMap<>());
@@ -80,9 +81,10 @@ public final class ConfiguratorTest {
         assertTrue(true);
     }
 
-    public static final class DefaultEndpoint extends Endpoint {
+    static final class DefaultEndpoint extends Endpoint {
         @Override
         public void onOpen(Session session, EndpointConfig config) {
+            // Test endpoint never opens a real session.
         }
     }
 }

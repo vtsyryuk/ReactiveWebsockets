@@ -16,7 +16,7 @@ import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.Session;
 
 @SuppressWarnings({"synthetic-access"})
-public final class MemoryConsumptionTest {
+final class MemoryConsumptionTest {
 
     private SocketEndpoint webappClient;
     private SocketEndpoint webappServer;
@@ -28,7 +28,7 @@ public final class MemoryConsumptionTest {
     private Session webappSession;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         Scheduler scheduler = Schedulers.trampoline();
         Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
         ReplyMessageService textMessageService = new ReplyMessageService();
@@ -86,7 +86,7 @@ public final class MemoryConsumptionTest {
     }
 
     @Test
-    public void testBasicFlow() {
+    void testBasicFlow() {
 
         EndpointConfig endpointConfig = Mockito.mock(EndpointConfig.class);
 
@@ -102,11 +102,11 @@ public final class MemoryConsumptionTest {
 
         RequestMessage msgSub = new RequestMessage();
         MessageSubject subject = MessageSubjectFactory.create("Subject", "Subject1");
-        msgSub.setContent(RequestMessageType.Subscribe);
+        msgSub.setContent(RequestMessageType.SUBSCRIBE);
         msgSub.setSubject(subject);
 
         RequestMessage msgUnsub = new RequestMessage();
-        msgUnsub.setContent(RequestMessageType.Unsubscribe);
+        msgUnsub.setContent(RequestMessageType.UNSUBSCRIBE);
         msgUnsub.setSubject(subject);
 
         ReplyMessage msgConf = ReplyMessage.create(subject, "Subscribed to " + subject);

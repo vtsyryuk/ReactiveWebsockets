@@ -59,7 +59,7 @@ public class SubscriptionRouter implements DataSource {
      */
     public void reSendSubscribeRequests() {
         for (Entry<MessageSubject, Observable<ReplyMessage>> item : replyStreams.entrySet()) {
-            generateRequest(RequestMessageType.Subscribe, item.getKey());
+            generateRequest(RequestMessageType.SUBSCRIBE, item.getKey());
         }
     }
 
@@ -73,9 +73,9 @@ public class SubscriptionRouter implements DataSource {
 
         final Observable<ReplyMessage> requestGenerator = Observable.<ReplyMessage>create(emitter -> {
             final Disposable connection = confirmationStream.connect();
-            generateRequest(RequestMessageType.Subscribe, subject);
+            generateRequest(RequestMessageType.SUBSCRIBE, subject);
             emitter.setCancellable(() -> {
-                generateRequest(RequestMessageType.Unsubscribe, subject);
+                generateRequest(RequestMessageType.UNSUBSCRIBE, subject);
                 connection.dispose();
                 replyStreams.remove(subject);
             });

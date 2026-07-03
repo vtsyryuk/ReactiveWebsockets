@@ -8,13 +8,13 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public final class MessageCodecTest {
+final class MessageCodecTest {
 
     @Test
-    public void requestEncoderAndDecoderRoundTripMessage() throws Exception {
+    void requestEncoderAndDecoderRoundTripMessage() throws Exception {
         MessageSubject subject = MessageSubject.of("topic", "prices");
         Instant timestamp = Instant.parse("2026-06-02T01:02:03Z");
-        RequestMessage message = RequestMessage.create(subject, RequestMessageType.Subscribe, timestamp);
+        RequestMessage message = RequestMessage.create(subject, RequestMessageType.SUBSCRIBE, timestamp);
         RequestMessageEncoder encoder = new RequestMessageEncoder();
         RequestMessageDecoder decoder = new RequestMessageDecoder();
         StringWriter writer = new StringWriter();
@@ -26,13 +26,13 @@ public final class MessageCodecTest {
         RequestMessage decoded = decoder.decode(new StringReader(writer.toString()));
         decoder.destroy();
 
-        assertEquals(RequestMessageType.Subscribe, decoded.getContent());
+        assertEquals(RequestMessageType.SUBSCRIBE, decoded.getContent());
         assertEquals(subject, decoded.getSubject());
         assertEquals(timestamp, decoded.getTimestamp());
     }
 
     @Test
-    public void replyEncoderAndDecoderRoundTripMessage() throws Exception {
+    void replyEncoderAndDecoderRoundTripMessage() throws Exception {
         MessageSubject subject = MessageSubject.of("topic", "prices");
         Instant timestamp = Instant.parse("2026-06-02T01:02:03Z");
         ReplyMessage message = ReplyMessage.create(subject, "42", timestamp);
@@ -53,7 +53,7 @@ public final class MessageCodecTest {
     }
 
     @Test
-    public void instantTypeAdapterSerializesIsoInstant() {
+    void instantTypeAdapterSerializesIsoInstant() {
         InstantTypeAdapter adapter = new InstantTypeAdapter();
         Instant timestamp = Instant.parse("2026-06-02T01:02:03Z");
 

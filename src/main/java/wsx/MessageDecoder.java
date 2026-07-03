@@ -25,10 +25,12 @@ public abstract class MessageDecoder<M extends Message<?>> implements Decoder.Te
 
     @Override
     public void init(EndpointConfig config) {
+        // No decoder state is initialized by this stateless Gson adapter.
     }
 
     @Override
     public void destroy() {
+        // No decoder resources are allocated by this stateless Gson adapter.
     }
 
     /**

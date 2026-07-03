@@ -12,7 +12,7 @@ import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.SendHandler;
 import java.io.IOException;
 
-public final class RequestMessageHandlerTest {
+final class RequestMessageHandlerTest {
 
     private RequestMessageHandler msgHandler;
     private SubscriptionRouter routerMock;
@@ -23,7 +23,7 @@ public final class RequestMessageHandlerTest {
 
     @BeforeEach
     @SuppressWarnings("synthetic-access")
-    public void setUp() {
+    void setUp() {
         clientEndpointMock = Mockito.mock(Async.class);
         routerMock = Mockito.mock(SubscriptionRouter.class);
         mockDataStream = PublishSubject.create();
@@ -37,10 +37,10 @@ public final class RequestMessageHandlerTest {
     }
 
     @Test
-    public void subscribeUnsubscribeTest() {
+    void subscribeUnsubscribeTest() {
         RequestMessage msg = new RequestMessage();
         MessageSubject subject = MessageSubjectFactory.create("Subject", "testSubject1");
-        msg.setContent(RequestMessageType.Subscribe);
+        msg.setContent(RequestMessageType.SUBSCRIBE);
         msg.setSubject(subject);
 
         msgHandler.onMessage(msg);
@@ -55,7 +55,7 @@ public final class RequestMessageHandlerTest {
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
 
 
-        msg.setContent(RequestMessageType.Unsubscribe);
+        msg.setContent(RequestMessageType.UNSUBSCRIBE);
         msgHandler.onMessage(msg);
         mockDataStream.onNext(ReplyMessage.create(subject, content));
         Mockito.verify(clientEndpointMock, Mockito.times(1))
@@ -64,18 +64,16 @@ public final class RequestMessageHandlerTest {
     }
 
     @Test
-    public void duplicateCommandTest() {
+    void duplicateCommandTest() {
         RequestMessage msg = new RequestMessage();
         MessageSubject key = MessageSubjectFactory.create("Subject", "testSubject1");
-        msg.setContent(RequestMessageType.Subscribe);
+        msg.setContent(RequestMessageType.SUBSCRIBE);
         msg.setSubject(key);
 
-        try {
+        assertDoesNotThrow(() -> {
             msgHandler.onMessage(msg);
             msgHandler.onMessage(msg);
-        } catch (Exception e) {
-            fail("Duplicate subscribe command having the same subject should not throw");
-        }
+        }, "Duplicate subscribe command having the same subject should not throw");
 
         String content = "testContent1";
         mockDataStream.onNext(ReplyMessage.create(key, content));
@@ -83,22 +81,20 @@ public final class RequestMessageHandlerTest {
         Mockito.verify(clientEndpointMock, Mockito.times(1))
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
 
-        msg.setContent(RequestMessageType.Unsubscribe);
-        try {
+        msg.setContent(RequestMessageType.UNSUBSCRIBE);
+        assertDoesNotThrow(() -> {
             msgHandler.onMessage(msg);
             msgHandler.onMessage(msg);
-        } catch (Exception e) {
-            fail("Duplicate unsubscribe command having the same subject should not throw");
-        }
+        }, "Duplicate unsubscribe command having the same subject should not throw");
         mockDataStream.onNext(ReplyMessage.create(key, content));
         Mockito.verify(clientEndpointMock, Mockito.times(1))
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
     }
 
     @Test
-    public void closeTest() {
+    void closeTest() {
         MessageSubject subject = MessageSubjectFactory.create("Subject", "TestSubject1");
-        RequestMessage msg = RequestMessage.create(subject, RequestMessageType.Subscribe);
+        RequestMessage msg = RequestMessage.create(subject, RequestMessageType.SUBSCRIBE);
         msgHandler.onMessage(msg);
 
 
@@ -108,11 +104,7 @@ public final class RequestMessageHandlerTest {
         Mockito.verify(clientEndpointMock, Mockito.times(1))
                 .sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
 
-        try {
-            msgHandler.close();
-        } catch (IOException e) {
-            fail("close thrown unexpected exception");
-        }
+        assertDoesNotThrow(msgHandler::close, "close thrown unexpected exception");
 
         mockDataStream.onNext(ReplyMessage.create(subject, content));
         Mockito.verify(clientEndpointMock, Mockito.times(1))

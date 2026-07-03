@@ -17,10 +17,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public final class MessageHandlerDiagnosticsTest {
+final class MessageHandlerDiagnosticsTest {
 
     @Test
-    public void requestSendHandlerPublishesSuccessAndFailureDiagnostics() {
+    void requestSendHandlerPublishesSuccessAndFailureDiagnostics() {
         MessageSubject subject = MessageSubject.of("topic", "prices");
         PublishSubject<DiagnosticMessage> diagnostics = PublishSubject.create();
         List<DiagnosticMessage> messages = new ArrayList<>();
@@ -42,7 +42,7 @@ public final class MessageHandlerDiagnosticsTest {
     }
 
     @Test
-    public void requestHandlerRepliesToUnknownCommandAndStreamFailures() throws IOException {
+    void requestHandlerRepliesToUnknownCommandAndStreamFailures() throws IOException {
         Async clientEndpoint = Mockito.mock(Async.class);
         DataSource dataSource = Mockito.mock(DataSource.class);
         PublishSubject<DiagnosticMessage> diagnostics = PublishSubject.create();
@@ -55,7 +55,7 @@ public final class MessageHandlerDiagnosticsTest {
         RequestMessage unknown = RequestMessage.create(subject, null);
         handler.onMessage(unknown);
 
-        RequestMessage subscribe = RequestMessage.create(subject, RequestMessageType.Subscribe);
+        RequestMessage subscribe = RequestMessage.create(subject, RequestMessageType.SUBSCRIBE);
         Mockito.when(dataSource.getDataStream(subject)).thenReturn(Observable.error(new IllegalStateException("boom")));
         handler.onMessage(subscribe);
 
@@ -69,7 +69,7 @@ public final class MessageHandlerDiagnosticsTest {
     }
 
     @Test
-    public void requestHandlerRepliesWhenSubscriptionCreationThrows() throws IOException {
+    void requestHandlerRepliesWhenSubscriptionCreationThrows() throws IOException {
         Async clientEndpoint = Mockito.mock(Async.class);
         DataSource dataSource = Mockito.mock(DataSource.class);
         PublishSubject<DiagnosticMessage> diagnostics = PublishSubject.create();
@@ -80,7 +80,7 @@ public final class MessageHandlerDiagnosticsTest {
         MessageSubject subject = MessageSubject.of("topic", "prices");
 
         Mockito.when(dataSource.getDataStream(subject)).thenThrow(new IllegalStateException("cannot subscribe"));
-        handler.onMessage(RequestMessage.create(subject, RequestMessageType.Subscribe));
+        handler.onMessage(RequestMessage.create(subject, RequestMessageType.SUBSCRIBE));
 
         Mockito.verify(clientEndpoint).sendObject(Mockito.any(ReplyMessage.class), Mockito.any(SendHandler.class));
         assertTrue(messages.stream().anyMatch(message -> message.getLevel() == DiagnosticLevel.ERROR
@@ -89,7 +89,7 @@ public final class MessageHandlerDiagnosticsTest {
     }
 
     @Test
-    public void requestHandlerReportsCompletedSourceSequence() throws IOException {
+    void requestHandlerReportsCompletedSourceSequence() throws IOException {
         Async clientEndpoint = Mockito.mock(Async.class);
         DataSource dataSource = Mockito.mock(DataSource.class);
         PublishSubject<DiagnosticMessage> diagnostics = PublishSubject.create();
@@ -100,7 +100,7 @@ public final class MessageHandlerDiagnosticsTest {
         MessageSubject subject = MessageSubject.of("topic", "prices");
 
         Mockito.when(dataSource.getDataStream(subject)).thenReturn(Observable.empty());
-        handler.onMessage(RequestMessage.create(subject, RequestMessageType.Subscribe));
+        handler.onMessage(RequestMessage.create(subject, RequestMessageType.SUBSCRIBE));
 
         assertTrue(messages.stream().anyMatch(message -> message.getLevel() == DiagnosticLevel.INFO
                 && message.getMessage().contains("completed")));
@@ -108,7 +108,7 @@ public final class MessageHandlerDiagnosticsTest {
     }
 
     @Test
-    public void replyHandlerForwardsRequestsAndPublishesReplies() throws IOException {
+    void replyHandlerForwardsRequestsAndPublishesReplies() throws IOException {
         Async serverEndpoint = Mockito.mock(Async.class);
         PublishSubject<RequestMessage> requestStream = PublishSubject.create();
         PublishSubject<ReplyMessage> replyPublisher = PublishSubject.create();
@@ -121,7 +121,7 @@ public final class MessageHandlerDiagnosticsTest {
                 diagnostics, Schedulers.trampoline());
         MessageSubject subject = MessageSubject.of("topic", "prices");
 
-        requestStream.onNext(RequestMessage.create(subject, RequestMessageType.Subscribe));
+        requestStream.onNext(RequestMessage.create(subject, RequestMessageType.SUBSCRIBE));
         handler.onMessage(ReplyMessage.create(subject, "42"));
 
         ArgumentCaptor<SendHandler> sendHandlerCaptor = ArgumentCaptor.forClass(SendHandler.class);

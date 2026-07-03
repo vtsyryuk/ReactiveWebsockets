@@ -7,10 +7,10 @@ import java.util.Objects;
 
 /**
  * Immutable set of key/value fields used to route request and reply messages.
+ *
+ * @param fields subject fields
  */
-public final class MessageSubject {
-    private final Map<String, String> fields;
-
+public record MessageSubject(Map<String, String> fields) {
     /**
      * Creates a subject from the supplied fields.
      *
@@ -28,7 +28,7 @@ public final class MessageSubject {
      * @return immutable message subject
      */
     public static MessageSubject of(String name, String value) {
-        Map<String, String> fields = new HashMap<>(1);
+        Map<String, String> fields = HashMap.newHashMap(1);
         fields.put(name, value);
         return new MessageSubject(fields);
     }
@@ -40,17 +40,6 @@ public final class MessageSubject {
      */
     public Map<String, String> getFields() {
         return fields;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-
-        return obj instanceof MessageSubject && (obj == this || this.fields.equals(((MessageSubject) obj).fields));
-    }
-
-    @Override
-    public int hashCode() {
-        return fields.hashCode();
     }
 
     @Override

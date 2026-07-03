@@ -17,13 +17,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public final class AutoReconnectionTest {
+final class AutoReconnectionTest {
 
     @Test
-    public void closeCancelsPendingReconnectAttempt() throws Exception {
+    void closeCancelsPendingReconnectAttempt() throws Exception {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         SessionManager sessionManager = Mockito.mock(SessionManager.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
@@ -51,7 +52,7 @@ public final class AutoReconnectionTest {
     }
 
     @Test
-    public void connectToServerReturnsWhenAlreadyClosed() throws Exception {
+    void connectToServerReturnsWhenAlreadyClosed() throws Exception {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
         PublishSubject<DiagnosticMessage> diagnostics = PublishSubject.create();
@@ -80,7 +81,7 @@ public final class AutoReconnectionTest {
     }
 
     @Test
-    public void connectsAfterDelayRunsGreetingAndClosesServerSession() throws Exception {
+    void connectsAfterDelayRunsGreetingAndClosesServerSession() throws Exception {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
         Session serverSession = Mockito.mock(Session.class);
@@ -116,7 +117,7 @@ public final class AutoReconnectionTest {
     }
 
     @Test
-    public void reconnectsAfterEndpointCloseAndPublishesConnectionStatus() throws Exception {
+    void reconnectsAfterEndpointCloseAndPublishesConnectionStatus() throws Exception {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         SessionManager sessionManager = Mockito.mock(SessionManager.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
@@ -153,7 +154,7 @@ public final class AutoReconnectionTest {
     }
 
     @Test
-    public void connectionFailuresArePublishedAsDiagnostics() {
+    void connectionFailuresArePublishedAsDiagnostics() {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
         PublishSubject<DiagnosticMessage> diagnostics = PublishSubject.create();
@@ -162,12 +163,9 @@ public final class AutoReconnectionTest {
         SocketEndpoint endpoint = new SocketEndpoint(Mockito.mock(SessionManager.class), diagnostics);
         TestScheduler scheduler = new TestScheduler();
 
-        try {
+        assertDoesNotThrow(() ->
             Mockito.when(container.connectToServer(endpoint, clientConfig, URI.create("ws://localhost/test")))
-                    .thenThrow(new IOException("cannot connect"));
-        } catch (Exception e) {
-            throw new AssertionError(e);
-        }
+                    .thenThrow(new IOException("cannot connect")));
 
         new AutoReconnection.Builder(
                 container,
@@ -189,7 +187,7 @@ public final class AutoReconnectionTest {
     }
 
     @Test
-    public void closePublishesDiagnosticsWhenServerSessionCloseFails() throws Exception {
+    void closePublishesDiagnosticsWhenServerSessionCloseFails() throws Exception {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
         Session serverSession = Mockito.mock(Session.class);
@@ -225,7 +223,7 @@ public final class AutoReconnectionTest {
     }
 
     @Test
-    public void builderRejectsInvalidArguments() {
+    void builderRejectsInvalidArguments() {
         WebSocketContainer container = Mockito.mock(WebSocketContainer.class);
         ClientEndpointConfig clientConfig = Mockito.mock(ClientEndpointConfig.class);
         SocketEndpoint endpoint = new SocketEndpoint(Mockito.mock(SessionManager.class), PublishSubject.create());

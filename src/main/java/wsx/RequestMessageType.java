@@ -5,8 +5,8 @@ package wsx;
  */
 public enum RequestMessageType {
 
-    Subscribe("subscribe"),
-    Unsubscribe("unsubscribe");
+    SUBSCRIBE("subscribe"),
+    UNSUBSCRIBE("unsubscribe");
 
     private final String value;
 
@@ -26,19 +26,19 @@ public enum RequestMessageType {
     /**
      * Reports whether this command opens a subscription.
      *
-     * @return true when this is {@link #Subscribe}
+     * @return true when this is {@link #SUBSCRIBE}
      */
     public boolean isSubscribe() {
-        return this.value.equals(Subscribe.value);
+        return this == SUBSCRIBE;
     }
 
     /**
      * Reports whether this command closes a subscription.
      *
-     * @return true when this is {@link #Unsubscribe}
+     * @return true when this is {@link #UNSUBSCRIBE}
      */
     public boolean isUnsubscribe() {
-        return this.value.equals(Unsubscribe.value);
+        return this == UNSUBSCRIBE;
     }
 
     @Override

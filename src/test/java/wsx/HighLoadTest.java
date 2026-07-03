@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @SuppressWarnings({"synthetic-access"})
-public final class HighLoadTest {
+final class HighLoadTest {
 
     private SocketEndpoint webappClient;
     private SocketEndpoint webappServer;
@@ -35,7 +35,7 @@ public final class HighLoadTest {
     private List<RequestMessage> unsubMessages;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         Scheduler scheduler = Schedulers.trampoline();
         Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
         ReplyMessageService textMessageService = new ReplyMessageService();
@@ -119,16 +119,16 @@ public final class HighLoadTest {
             ReplyMessage confMsg = ReplyMessage.create(subj, "Subscribed to " + subj);
             confMessages.add(confMsg);
 
-            RequestMessage subMsg = RequestMessage.create(subj, RequestMessageType.Subscribe);
+            RequestMessage subMsg = RequestMessage.create(subj, RequestMessageType.SUBSCRIBE);
             subMessages.add(subMsg);
 
-            RequestMessage unsubMsg = RequestMessage.create(subj, RequestMessageType.Unsubscribe);
+            RequestMessage unsubMsg = RequestMessage.create(subj, RequestMessageType.UNSUBSCRIBE);
             unsubMessages.add(unsubMsg);
         }
     }
 
     @Test
-    public void testHighLoadBasicFlow() {
+    void testHighLoadBasicFlow() {
 
         EndpointConfig endpointConfig = Mockito.mock(EndpointConfig.class);
 
@@ -143,6 +143,7 @@ public final class HighLoadTest {
         webappHandler = null;
         webappClient.onOpen(webappSession, endpointConfig);
 
+        assertTrue(browsers.stream().allMatch(browser -> browser.handler != null));
         for (BrowserSessionMock m : browsers) {
             assertNotNull(m.handler);
         }
@@ -238,7 +239,7 @@ public final class HighLoadTest {
     }
 
     @Test
-    public void testMemory() {
+    void testMemory() {
 
         EndpointConfig endpointConfig = Mockito.mock(EndpointConfig.class);
 

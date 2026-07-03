@@ -37,7 +37,8 @@ public class SimpleSessionManager<T> implements SessionManager {
                 if (clientMessageHandler == handler) {
                     return h;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception _) {
+                // Some websocket wrappers do not expose getWrappedHandler; fall back to the original handler.
             }
         }
         return handler;
@@ -66,7 +67,8 @@ public class SimpleSessionManager<T> implements SessionManager {
     private static void tryCloseMessageHandler(final Closeable closeable) {
         try {
             closeable.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
+            // Disposal should continue even if an application handler refuses to close.
         }
     }
 
@@ -74,7 +76,8 @@ public class SimpleSessionManager<T> implements SessionManager {
         if (registeredHandler != null) {
             try {
                 session.removeMessageHandler(registeredHandler);
-            } catch (Exception ignored) {
+            } catch (Exception _) {
+                // Session cleanup is best-effort because containers can remove handlers during close.
             }
         }
     }

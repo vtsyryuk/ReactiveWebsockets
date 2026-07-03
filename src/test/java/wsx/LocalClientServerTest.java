@@ -17,7 +17,7 @@ import javax.websocket.SendHandler;
 import javax.websocket.Session;
 
 @SuppressWarnings({"synthetic-access"})
-public final class LocalClientServerTest {
+final class LocalClientServerTest {
 
     private SocketEndpoint webappClient;
     private SocketEndpoint webappServer;
@@ -34,7 +34,7 @@ public final class LocalClientServerTest {
     private Async browserEndpoint2;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         Scheduler scheduler = Schedulers.trampoline();
         Observer<DiagnosticMessage> diagnosticPublisher = new DiagnosticMessageService().getPublisher();
         ReplyMessageService textMessageService = new ReplyMessageService();
@@ -102,7 +102,7 @@ public final class LocalClientServerTest {
     }
 
     @Test
-    public void testBasicFlow() {
+    void testBasicFlow() {
 
         EndpointConfig endpointConfig = Mockito.mock(EndpointConfig.class);
 
@@ -120,8 +120,8 @@ public final class LocalClientServerTest {
         assertNotNull(webappHandler);
 
         MessageSubject subject = MessageSubjectFactory.create("Subject", "Subject1");
-        RequestMessage msgSub = RequestMessage.create(subject, RequestMessageType.Subscribe);
-        RequestMessage msgUnsub = RequestMessage.create(subject, RequestMessageType.Unsubscribe);
+        RequestMessage msgSub = RequestMessage.create(subject, RequestMessageType.SUBSCRIBE);
+        RequestMessage msgUnsub = RequestMessage.create(subject, RequestMessageType.UNSUBSCRIBE);
 
         browserHandler1.onMessage(msgSub);
 

@@ -10,7 +10,7 @@ import io.reactivex.rxjava3.core.Observable;
 @Component
 public class PassthroughDataSource implements DataSource {
 
-    private static final String Subscribed = "Subscribed";
+    private static final String SUBSCRIBED = "Subscribed";
     private final Observable<ReplyMessage> replyStream;
 
     /**
@@ -32,7 +32,7 @@ public class PassthroughDataSource implements DataSource {
     @Override
     public Observable<ReplyMessage> getDataStream(MessageSubject subject) {
         final MessageSubject srcSubject = subject;
-        final ReplyMessage msgConfirmation = ReplyMessage.create(srcSubject, PassthroughDataSource.Subscribed);
+        final ReplyMessage msgConfirmation = ReplyMessage.create(srcSubject, PassthroughDataSource.SUBSCRIBED);
 
         return replyStream
                 .filter(msg -> msg.getSubject().equals(srcSubject))

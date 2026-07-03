@@ -58,18 +58,14 @@ public class ReplyMessageHandler implements CloseableMessageHandler<ReplyMessage
     }
 
     private static SendHandler createHandler(final MessageSubject subject, final Observer<DiagnosticMessage> diagnosticPublisher) {
-        return new SendHandler() {
-
-            @Override
-            public void onResult(SendResult result) {
-                if (result.isOK()) {
-                    String message = String.format("Successfully sent a request message to the %s subject", subject);
-                    diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, message));
-                } else {
-                    String message = String.format("Failed to publish a request message to the %s subject due to: %s", subject,
-                            sendFailure(result));
-                    diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
-                }
+        return result -> {
+            if (result.isOK()) {
+                String message = String.format("Successfully sent a request message to the %s subject", subject);
+                diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.DEBUG, message));
+            } else {
+                String message = String.format("Failed to publish a request message to the %s subject due to: %s", subject,
+                        sendFailure(result));
+                diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.WARN, message));
             }
         };
     }

@@ -4,10 +4,10 @@ import io.reactivex.rxjava3.observers.TestObserver;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 import org.junit.jupiter.api.Test;
 
-public final class PassthroughDataSourceTest {
+final class PassthroughDataSourceTest {
 
     @Test
-    public void dataStreamStartsWithConfirmationAndFiltersBySubject() {
+    void dataStreamStartsWithConfirmationAndFiltersBySubject() {
         PublishSubject<ReplyMessage> upstream = PublishSubject.create();
         PassthroughDataSource dataSource = new PassthroughDataSource(upstream);
         MessageSubject subject = MessageSubject.of("topic", "prices");

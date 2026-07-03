@@ -248,6 +248,7 @@ public class AutoReconnection implements Closeable {
     private static final class Noop implements Action {
         @Override
         public void run() {
+            // Optional lifecycle hook; default action intentionally does nothing.
         }
     }
 }

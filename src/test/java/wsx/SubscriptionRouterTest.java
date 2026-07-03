@@ -15,14 +15,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("synthetic-access")
-public final class SubscriptionRouterTest {
+final class SubscriptionRouterTest {
 
     private SubscriptionRouter router;
     private PublishSubject<ReplyMessage> textStream;
     private List<RequestMessage> requests;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         textStream = PublishSubject.create();
         router = new SubscriptionRouter(textStream);
         requests = new ArrayList<>();
@@ -30,13 +30,13 @@ public final class SubscriptionRouterTest {
     }
 
     @Test
-    public void subscriptionTest() {
+    void subscriptionTest() {
         final List<ReplyMessage> txtMsgs = new ArrayList<>();
         MessageSubject key = MessageSubjectFactory.create("Subject", "Subject1");
         Disposable s1 = router.getDataStream(key).subscribe(txtMsgs::add);
         assertEquals(1, requests.size());
-        assertTrue(requests.get(0).getContent() == RequestMessageType.Subscribe);
-        assertTrue(requests.get(0).getSubject() == key);
+        assertSame(RequestMessageType.SUBSCRIBE, requests.get(0).getContent());
+        assertSame(key, requests.get(0).getSubject());
         String content = "Content1";
         ReplyMessage txtMsg1 = ReplyMessage.create(key, content);
         textStream.onNext(txtMsg1);
@@ -44,22 +44,22 @@ public final class SubscriptionRouterTest {
 
         s1.dispose();
         assertEquals(2, requests.size());
-        assertTrue(requests.get(1).getContent() == RequestMessageType.Unsubscribe);
-        assertTrue(requests.get(1).getSubject() == key);
+        assertSame(RequestMessageType.UNSUBSCRIBE, requests.get(1).getContent());
+        assertSame(key, requests.get(1).getSubject());
         textStream.onNext(txtMsg1);
         assertEquals(1, txtMsgs.size());
     }
 
     @Test
-    public void multipleSubscriptionsTest() {
+    void multipleSubscriptionsTest() {
         final List<ReplyMessage> txtMsgs1 = new ArrayList<>();
         final List<ReplyMessage> txtMsgs2 = new ArrayList<>();
         MessageSubject key = MessageSubjectFactory.create("Subject", "Subject1");
         Disposable s1 = router.getDataStream(key).subscribe(txtMsgs1::add);
         Disposable s2 = router.getDataStream(key).subscribe(txtMsgs2::add);
         assertEquals(1, requests.size());
-        assertTrue(requests.get(0).getContent() == RequestMessageType.Subscribe);
-        assertTrue(requests.get(0).getSubject() == key);
+        assertSame(RequestMessageType.SUBSCRIBE, requests.get(0).getContent());
+        assertSame(key, requests.get(0).getSubject());
         String content = "Content1";
         ReplyMessage txtMsg1 = ReplyMessage.create(key, content);
         textStream.onNext(txtMsg1);
@@ -75,12 +75,12 @@ public final class SubscriptionRouterTest {
         assertEquals(3, txtMsgs2.size());
         s2.dispose();
         assertEquals(2, requests.size());
-        assertTrue(requests.get(1).getContent() == RequestMessageType.Unsubscribe);
-        assertTrue(requests.get(1).getSubject() == key);
+        assertSame(RequestMessageType.UNSUBSCRIBE, requests.get(1).getContent());
+        assertSame(key, requests.get(1).getSubject());
     }
 
     @Test
-    public void concurrentGetDataStreamReturnsSingleSharedStream() throws InterruptedException {
+    void concurrentGetDataStreamReturnsSingleSharedStream() throws InterruptedException {
         MessageSubject key = MessageSubjectFactory.create("Subject", "Subject1");
         Set<Integer> streamIdentities = ConcurrentHashMap.newKeySet();
         ExecutorService executor = Executors.newFixedThreadPool(8);
@@ -95,7 +95,7 @@ public final class SubscriptionRouterTest {
     }
 
     @Test
-    public void resendSubscribeRequestsEmitsCurrentSubjects() {
+    void resendSubscribeRequestsEmitsCurrentSubjects() {
         MessageSubject first = MessageSubjectFactory.create("Subject", "Subject1");
         MessageSubject second = MessageSubjectFactory.create("Subject", "Subject2");
 
@@ -106,7 +106,7 @@ public final class SubscriptionRouterTest {
         router.reSendSubscribeRequests();
 
         assertEquals(2, requests.size());
-        assertTrue(requests.stream().allMatch(request -> request.getContent() == RequestMessageType.Subscribe));
+        assertTrue(requests.stream().allMatch(request -> request.getContent() == RequestMessageType.SUBSCRIBE));
         assertTrue(requests.stream().map(RequestMessage::getSubject).anyMatch(first::equals));
         assertTrue(requests.stream().map(RequestMessage::getSubject).anyMatch(second::equals));
 
