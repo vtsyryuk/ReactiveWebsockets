@@ -1,5 +1,14 @@
 # ReactiveWebsockets
 
+[![CI](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/ci.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/ci.yml)
+[![GitHub Actions](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/actions.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/actions.yml)
+[![CodeQL](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/codeql.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/codeql.yml)
+[![Cloud E2E](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/cloud-e2e.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/cloud-e2e.yml)
+[![SonarCloud](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/sonarcloud.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/sonarcloud.yml)
+[![Dependency Review](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/dependency-review.yml)
+[![Dependency Submission](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/dependency-submission.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/dependency-submission.yml)
+[![Publish](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/publish.yml/badge.svg)](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/publish.yml)
+
 ReactiveWebsockets is a small Java library for routing websocket subscribe/unsubscribe requests to RxJava streams and publishing replies back to websocket clients.
 
 <!-- ci-status:start -->
@@ -12,6 +21,12 @@ ReactiveWebsockets is a small Java library for routing websocket subscribe/unsub
 Last updated from `master` at 2026-06-01 23:26 UTC for commit `3568ae2`.
 <!-- ci-status:end -->
 
+## Project Links
+
+- Demo deployment: https://reactive-websockets-demo.onrender.com
+- Render blueprint: `render.yaml`
+- SonarCloud summary: https://sonarcloud.io/project/overview?id=vtsyryuk_ReactiveWebsockets
+
 ## Requirements
 
 - Java 25
@@ -21,16 +36,15 @@ Last updated from `master` at 2026-06-01 23:26 UTC for commit `3568ae2`.
 ## Build
 
 ```bash
-./gradlew build
+./gradlew clean check
 ```
 
-The GitHub Actions CI workflow runs the same Gradle build on pushes and pull requests to `main` and `master`.
+The CI workflow builds the library, runs tests, generates JaCoCo XML/HTML coverage, enforces coverage verification, uploads build artifacts, and publishes a Gradle build scan. CodeQL, SonarCloud, Dependency Review, Dependabot, Gradle dependency submission, cloud UI E2E tests, and GitHub Actions workflow linting are enabled for quality, supply-chain, deployment, and workflow scanning.
 
 ## Test and Coverage
 
 ```bash
-./gradlew test
-./gradlew jacocoTestReport
+./gradlew test jacocoTestReport
 ```
 
 Coverage reports are written to:
@@ -40,40 +54,27 @@ Coverage reports are written to:
 
 Gradle is configured to use a Java 25 toolchain. If Java 25 is not available locally, Gradle can download a matching toolchain through the Foojay resolver.
 
-## VS Code
+## SonarCloud
 
-Open the repository folder in VS Code and install the recommended extensions when prompted. The workspace includes tasks for:
+SonarCloud analysis runs from the `SonarCloud Analysis` workflow on pushes, pull requests, and manual dispatch. The workflow builds the Java test and JaCoCo XML reports before invoking the Sonar Gradle scanner.
 
-- `Gradle: build`
-- `Gradle: test`
-- `Gradle: coverage`
+Required GitHub Actions configuration:
 
-If VS Code reports `there is no registered task type 'Java'`, install the recommended Java extensions and reload the window. This workspace only defines shell-based Gradle tasks, so a `Java` task usually comes from a stale user task or an extension-provided task that is unavailable.
+- secret `SONAR_TOKEN`: generated from SonarCloud
+- variable `SONAR_ORGANIZATION`: the SonarCloud organization key
+- variable `SONAR_PROJECT_KEY`: `vtsyryuk_ReactiveWebsockets`
 
-To clear it:
-
-1. Run `Extensions: Show Recommended Extensions` and install the recommendations.
-2. Run `Developer: Reload Window`.
-3. Run `Tasks: Run Task` and choose `Gradle: test`.
-4. If the error remains, run `Tasks: Open User Tasks` and remove any task whose `"type"` is `"Java"`.
+The workflow reports coverage from `build/reports/jacoco/test/jacocoTestReport.xml`. The demo HTTP service is excluded from Sonar coverage to match the JaCoCo verification scope for the reusable library. Until the secret and both variables exist, the workflow builds the reports and exits successfully with a notice instead of failing the PR.
 
 ## Publish
 
-Packages are deployed to GitHub Packages by `.github/workflows/deploy.yml` when a GitHub release is published, or when the workflow is run manually.
-
-The deployment workflow uses:
-
-- `actions/setup-java@v4`
-- `gradle/actions/setup-gradle@v6` with build scan publishing enabled
-- Temurin Java 25
-- Gradle `publishJarToMaven`, which runs verification before publishing
-- `GITHUB_TOKEN` with `packages: write`
-
-To run the same publish path locally, provide GitHub Packages credentials through `gpr.user`/`gpr.key` Gradle properties or `GITHUB_ACTOR`/`GITHUB_TOKEN` environment variables:
+Packages are deployed to GitHub Packages by the `Publish` workflow when a GitHub release is created, or when the workflow is run manually.
 
 ```bash
-./gradlew publishJarToMaven
+./gradlew publish -PreleaseVersion=2.0.0
 ```
+
+To run the same publish path locally, provide GitHub Packages credentials through `gpr.user`/`gpr.key` Gradle properties or `GITHUB_ACTOR`/`GITHUB_TOKEN` environment variables.
 
 ## Basic Usage
 
@@ -89,6 +90,50 @@ MessageSubject subject = MessageSubject.of("topic", "prices");
 router.getDataStream(subject).subscribe(reply -> {
     // Handle replies for this subject.
 });
+```
+
+## Deployment
+
+The library includes a small HTTP demo service with a browser UI and JSON API. It demonstrates:
+
+- browser clients subscribing to fake websocket topics
+- `SubscriptionRouter` emitting upstream subscribe/unsubscribe commands
+- publishing replies through `ReplyMessageService`
+- multiple clients sharing one upstream topic in a simulation
+
+Run it locally:
+
+```bash
+./gradlew run
+```
+
+Then try:
+
+```bash
+open http://localhost:8080
+curl http://localhost:8080/api/topics
+curl -X POST 'http://localhost:8080/api/subscribe?client=alice&topic=prices'
+curl -X POST 'http://localhost:8080/api/publish?topic=prices&content=price=42.10'
+curl -X POST 'http://localhost:8080/api/simulate?topic=alerts'
+```
+
+### Free Cloud Demo
+
+The repository includes `Dockerfile` and `render.yaml` for deploying the demo as a Render Free web service. In Render, create a new Blueprint from this repository. The service starts the Java demo container, exposes `/health`, and keeps demo subscriptions in memory.
+
+The expected Render service URL is https://reactive-websockets-demo.onrender.com after the Blueprint is created.
+
+Render Free web services are suitable for demos and hobby projects, but they can spin down after idle time and their local filesystem is ephemeral. Do not use the demo deployment as production storage or coordination infrastructure.
+
+### Cloud UI E2E
+
+The `Cloud E2E` workflow runs Playwright browser tests against the deployed Render demo. It is triggered by successful deployment status events, runs daily to keep the cloud demo and status badge fresh, and can also be run manually from GitHub Actions with an optional `base_url` override.
+
+Run the same tests locally against any deployed demo:
+
+```bash
+npm ci --ignore-scripts
+PLAYWRIGHT_BASE_URL=https://reactive-websockets-demo.onrender.com npm run test:e2e
 ```
 
 ## Message Flow

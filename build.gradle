@@ -1,12 +1,16 @@
 plugins {
     id 'java-library'
+    id 'application'
     id 'jacoco'
     id 'maven-publish'
+    alias(libs.plugins.sonarqube)
 }
 
 group = 'vt.reactivews'
-version = '2.0.0'
+version = providers.gradleProperty('releaseVersion').orElse('2.0-SNAPSHOT').get()
 description = 'Reactive websocket subscription routing for Java.'
+
+def coverageClassExcludes = ['wsx/demo/**']
 
 java {
     toolchain {
@@ -14,6 +18,10 @@ java {
     }
     withSourcesJar()
     withJavadocJar()
+}
+
+application {
+    mainClass = 'wsx.demo.ReactiveWebsocketsDemoServer'
 }
 
 dependencies {
@@ -54,6 +62,9 @@ jacoco {
 
 tasks.named('jacocoTestReport') {
     dependsOn tasks.named('test')
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: coverageClassExcludes)
+    }))
     reports {
         xml.required = true
         html.required = true
@@ -63,6 +74,9 @@ tasks.named('jacocoTestReport') {
 
 tasks.named('jacocoTestCoverageVerification') {
     dependsOn tasks.named('test')
+    classDirectories.setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it, exclude: coverageClassExcludes)
+    }))
     violationRules {
         rule {
             limit {
@@ -74,6 +88,22 @@ tasks.named('jacocoTestCoverageVerification') {
 
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+sonar {
+    properties {
+        property 'sonar.projectKey', providers.environmentVariable('SONAR_PROJECT_KEY')
+                .orElse('vtsyryuk_ReactiveWebsockets')
+                .get()
+        property 'sonar.organization', providers.environmentVariable('SONAR_ORGANIZATION')
+                .orElse('vtsyryuk')
+                .get()
+        property 'sonar.coverage.jacoco.xmlReportPaths',
+                layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile.path
+        property 'sonar.exclusions', 'src/main/java/wsx/demo/**'
+        property 'sonar.coverage.exclusions', 'src/main/java/wsx/demo/**'
+    }
 }
 
 tasks.withType(PublishToMavenRepository).configureEach {

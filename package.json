@@ -1,0 +1,12 @@
+{
+  "name": "reactive-websockets-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end UI tests for the ReactiveWebsockets cloud demo.",
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

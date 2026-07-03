@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: reactive-websockets-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PORT
+        value: 8080

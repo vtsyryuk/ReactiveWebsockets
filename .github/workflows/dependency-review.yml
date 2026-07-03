@@ -1,0 +1,36 @@
+# Dependency Review Action
+#
+# This Action scans dependency manifest files changed in pull requests and reports
+# known-vulnerable dependencies. It requires GitHub Dependency Graph to be enabled
+# for the repository.
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base ref to compare against
+        required: false
+        default: master
+      head_ref:
+        description: Head ref to review
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v5
+        with:
+          base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base_ref }}
+          head-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head_ref || github.sha }}

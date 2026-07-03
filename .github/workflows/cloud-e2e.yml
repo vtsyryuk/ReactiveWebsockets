@@ -1,0 +1,49 @@
+name: Cloud E2E
+
+on:
+  deployment_status:
+  schedule:
+    - cron: '47 3 * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Cloud demo URL to test
+        required: false
+        default: https://reactive-websockets-demo.onrender.com
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-ui:
+    name: Run Cloud UI Tests
+    runs-on: ubuntu-latest
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || 'https://reactive-websockets-demo.onrender.com' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install test dependencies
+        run: npm ci --ignore-scripts --no-audit --fund=false
+
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Run cloud UI tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: cloud-e2e-playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
