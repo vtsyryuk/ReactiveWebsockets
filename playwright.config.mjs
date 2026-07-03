@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "https://reactive-websockets-demo.onrender.com";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "https://reactivewebsockets.onrender.com";
 
 export default defineConfig({
   testDir: "./tests/e2e",

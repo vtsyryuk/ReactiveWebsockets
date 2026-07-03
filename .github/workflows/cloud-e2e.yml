@@ -9,7 +9,7 @@ on:
       base_url:
         description: Cloud demo URL to test
         required: false
-        default: https://reactive-websockets-demo.onrender.com
+        default: https://reactivewebsockets.onrender.com
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
     env:
-      PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || 'https://reactive-websockets-demo.onrender.com' }}
+      PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || 'https://reactivewebsockets.onrender.com' }}
 
     steps:
       - name: Checkout

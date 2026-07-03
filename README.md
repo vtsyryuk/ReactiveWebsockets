@@ -23,7 +23,7 @@ Last updated from `master` at 2026-07-03 03:53 UTC for commit `6661936`.
 
 ## Project Links
 
-- Demo deployment: https://reactive-websockets-demo.onrender.com
+- Demo deployment: https://reactivewebsockets.onrender.com
 - Render blueprint: `render.yaml`
 - SonarCloud summary: https://sonarcloud.io/project/overview?id=vtsyryuk_ReactiveWebsockets
 
@@ -121,7 +121,7 @@ curl -X POST 'http://localhost:8080/api/simulate?topic=alerts'
 
 The repository includes `Dockerfile` and `render.yaml` for deploying the demo as a Render Free web service. In Render, create a new Blueprint from this repository. The service starts the Java demo container, exposes `/health`, and keeps demo subscriptions in memory.
 
-The expected Render service URL is https://reactive-websockets-demo.onrender.com after the Blueprint is created.
+The demo is deployed on Render at https://reactivewebsockets.onrender.com.
 
 Render Free web services are suitable for demos and hobby projects, but they can spin down after idle time and their local filesystem is ephemeral. Do not use the demo deployment as production storage or coordination infrastructure.
 
@@ -133,7 +133,7 @@ Run the same tests locally against any deployed demo:
 
 ```bash
 npm ci --ignore-scripts
-PLAYWRIGHT_BASE_URL=https://reactive-websockets-demo.onrender.com npm run test:e2e
+PLAYWRIGHT_BASE_URL=https://reactivewebsockets.onrender.com npm run test:e2e
 ```
 
 ## Message Flow

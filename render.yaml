@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: reactive-websockets-demo
+    name: reactivewebsockets
     runtime: docker
     plan: free
     region: singapore
