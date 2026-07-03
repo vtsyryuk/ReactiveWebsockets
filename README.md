@@ -23,8 +23,10 @@ Last updated from `master` at 2026-07-03 04:09 UTC for commit `ebcf479`.
 
 ## Project Links
 
-- Demo deployment: https://reactivewebsockets.onrender.com
+- Live demo: https://reactivewebsockets.onrender.com
 - Render blueprint: `render.yaml`
+- Cloud E2E workflow: https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/cloud-e2e.yml
+- Latest verified cloud run: https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/28637845856
 - SonarCloud summary: https://sonarcloud.io/project/overview?id=vtsyryuk_ReactiveWebsockets
 
 ## Requirements
@@ -92,7 +94,7 @@ router.getDataStream(subject).subscribe(reply -> {
 });
 ```
 
-## Deployment
+## Demo Deployment
 
 The library includes a small HTTP demo service with a browser UI and JSON API. It demonstrates:
 
@@ -100,6 +102,8 @@ The library includes a small HTTP demo service with a browser UI and JSON API. I
 - `SubscriptionRouter` emitting upstream subscribe/unsubscribe commands
 - publishing replies through `ReplyMessageService`
 - multiple clients sharing one upstream topic in a simulation
+
+The hosted demo is deployed on Render at https://reactivewebsockets.onrender.com.
 
 Run it locally:
 
@@ -117,17 +121,17 @@ curl -X POST 'http://localhost:8080/api/publish?topic=prices&content=price=42.10
 curl -X POST 'http://localhost:8080/api/simulate?topic=alerts'
 ```
 
-### Free Cloud Demo
+### Render Free Cloud Demo
 
-The repository includes `Dockerfile` and `render.yaml` for deploying the demo as a Render Free web service. In Render, create a new Blueprint from this repository. The service starts the Java demo container, exposes `/health`, and keeps demo subscriptions in memory.
-
-The demo is deployed on Render at https://reactivewebsockets.onrender.com.
+The repository includes `Dockerfile` and `render.yaml` for deploying the demo as a Render Free web service. In Render, create a new Blueprint from this repository. The service starts the Java demo container, exposes `/health`, serves the browser UI from `/`, and keeps demo subscriptions in memory.
 
 Render Free web services are suitable for demos and hobby projects, but they can spin down after idle time and their local filesystem is ephemeral. Do not use the demo deployment as production storage or coordination infrastructure.
 
 ### Cloud UI E2E
 
-The `Cloud E2E` workflow runs Playwright browser tests against the deployed Render demo. It is triggered by successful deployment status events, runs daily to keep the cloud demo and status badge fresh, and can also be run manually from GitHub Actions with an optional `base_url` override.
+The `Cloud E2E` workflow runs Playwright browser tests against the deployed Render demo. It can run after successful deployment status events, runs daily to keep the cloud demo and status badge fresh, and can also be run manually from GitHub Actions with an optional `base_url` override.
+
+The current Render demo URL was verified by the `Cloud E2E` workflow in run [#28637845856](https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/28637845856).
 
 Run the same tests locally against any deployed demo:
 
