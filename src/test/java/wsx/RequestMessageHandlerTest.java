@@ -10,7 +10,6 @@ import io.reactivex.rxjava3.subjects.PublishSubject;
 
 import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.SendHandler;
-import java.io.IOException;
 
 final class RequestMessageHandlerTest {
 

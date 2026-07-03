@@ -313,6 +313,8 @@ final class HighLoadTest {
                 }
             }
         }
+
+        assertTrue(browsers.stream().allMatch(browser -> browser.handler != null));
     }
 
     private class BrowserSessionMock {
