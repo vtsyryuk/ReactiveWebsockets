@@ -2,17 +2,19 @@
 gson = "2.14.0"
 jacoco = "0.8.14"
 java = "25"
-junit-jupiter = "6.1.0"
+junit-jupiter = "6.1.1"
 junit-platform = "6.1.1"
 mockito = "5.23.0"
 rxjava = "3.1.12"
 sonarqube = "7.3.1.8318"
 spring = "7.0.8"
-javaee-api = "8.0.1"
+servlet-api = "4.0.1"
+websocket-api = "1.1"
 
 [libraries]
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
-javaee-api = { module = "javax:javaee-api", version.ref = "javaee-api" }
+servlet-api = { module = "javax.servlet:javax.servlet-api", version.ref = "servlet-api" }
+websocket-api = { module = "javax.websocket:javax.websocket-api", version.ref = "websocket-api" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }

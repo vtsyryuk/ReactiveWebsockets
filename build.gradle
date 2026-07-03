@@ -26,12 +26,15 @@ application {
 
 dependencies {
     api libs.rxjava
-    api libs.gson
 
-    compileOnly libs.javaee.api
+    implementation libs.gson
+
+    compileOnlyApi libs.websocket.api
+    compileOnly libs.servlet.api
     compileOnly libs.spring.context
 
-    testImplementation libs.javaee.api
+    testImplementation libs.servlet.api
+    testImplementation libs.websocket.api
     testImplementation libs.spring.context
     testImplementation libs.junit.jupiter
     testImplementation libs.mockito.core

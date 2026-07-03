@@ -14,7 +14,7 @@ import java.time.Instant;
 /**
  * Gson adapter that serializes {@link Instant} values as ISO-8601 strings.
  */
-public final class InstantTypeAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
+final class InstantTypeAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
 
     /**
      * Serializes an instant into a JSON string.
