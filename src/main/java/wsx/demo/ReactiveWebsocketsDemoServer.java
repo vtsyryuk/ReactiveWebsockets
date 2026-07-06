@@ -32,6 +32,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 
+/**
+ * Small HTTP demo that exercises the library without requiring a real websocket server.
+ *
+ * <p>The demo keeps all state in memory, exposes JSON endpoints for scripted checks, and serves a browser UI from
+ * classpath resources. It is intentionally excluded from published library artifacts and packaged separately for the
+ * runnable application distribution.</p>
+ */
 public final class ReactiveWebsocketsDemoServer {
 
     private static final int DEFAULT_PORT = 8080;

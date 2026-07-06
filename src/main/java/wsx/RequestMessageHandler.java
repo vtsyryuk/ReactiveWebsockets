@@ -176,7 +176,6 @@ public final class RequestMessageHandler implements CloseableMessageHandler<Requ
         }
     }
 
-    @SuppressWarnings("synthetic-access")
     private Disposable createSubscription(final MessageSubject subject) {
         final SendHandler sendHandler = createSendHandler(subject, diagnosticPublisher);
 

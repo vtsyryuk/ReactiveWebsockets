@@ -21,7 +21,6 @@ final class RequestMessageHandlerTest {
     private int dataSubscriptionCount;
 
     @BeforeEach
-    @SuppressWarnings("synthetic-access")
     void setUp() {
         clientEndpointMock = Mockito.mock(Async.class);
         routerMock = Mockito.mock(SubscriptionRouter.class);

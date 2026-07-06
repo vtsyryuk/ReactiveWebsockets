@@ -4,6 +4,7 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.core.Scheduler;
 import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.disposables.SerialDisposable;
 import io.reactivex.rxjava3.functions.Action;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
@@ -15,11 +16,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Maintains a client websocket connection and retries connection attempts after closures.
  */
-@SuppressWarnings("synthetic-access")
 public class AutoReconnection implements Closeable {
 
     private static final MessageSubject CONNECTION_STATUS_SUBJECT = MessageSubject.of("Connection", "Status");
@@ -33,10 +35,12 @@ public class AutoReconnection implements Closeable {
     private final long delay;
     private final long period;
     private final TimeUnit unit;
-    private Disposable closeDisposable;
-    private Disposable reconnectDisposable;
-    private Session serverSession;
-    private boolean closed;
+    private final Disposable closeDisposable;
+    private final SerialDisposable scheduledReconnectAttempt = new SerialDisposable();
+    // Tracks the live connection owned by this controller, including late connections racing with close().
+    private final AtomicReference<Session> activeServerSession = new AtomicReference<>();
+    // Set once by close(); timer callbacks use it to stop retrying and close late sessions.
+    private final AtomicBoolean closeRequested = new AtomicBoolean();
 
     private AutoReconnection(final Builder builder) {
 
@@ -62,53 +66,74 @@ public class AutoReconnection implements Closeable {
         connectToServer();
     }
 
-    private synchronized void connectToServer() {
-        if (closed) {
+    private void connectToServer() {
+        if (closeRequested.get()) {
             return;
-        }
-        if (reconnectDisposable != null && !reconnectDisposable.isDisposed()) {
-            reconnectDisposable.dispose();
         }
 
         final Observable<Long> timer = Observable
                 .interval(delay, period, unit, scheduler);
 
-        reconnectDisposable = timer
-                .filter(tick -> {
-                    try {
-                        serverSession = container.connectToServer(clientEndpoint, clientConfig, serverUri);
-                        greetingAction.run();
-                        return true;
-                    } catch (Throwable e) {
-                        diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, e.getMessage()));
-                        return false;
-                    }
-                })
+        Disposable reconnectAttempt = timer
+                .filter(tick -> attemptConnection())
                 .take(1)
                 .subscribe();
+        scheduledReconnectAttempt.set(reconnectAttempt);
+    }
+
+    private boolean attemptConnection() {
+        if (closeRequested.get()) {
+            return true;
+        }
+        Session connectedSession = null;
+        try {
+            connectedSession = container.connectToServer(clientEndpoint, clientConfig, serverUri);
+            greetingAction.run();
+            keepConnectedSession(connectedSession);
+            return true;
+        } catch (Throwable e) {
+            closeSession(connectedSession);
+            diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, e.getMessage()));
+            return false;
+        }
+    }
+
+    private void keepConnectedSession(final Session connectedSession) {
+        if (closeRequested.get()) {
+            closeSession(connectedSession);
+            return;
+        }
+        Session previousSession = activeServerSession.getAndSet(connectedSession);
+        if (closeRequested.get()) {
+            Session currentSession = activeServerSession.getAndSet(null);
+            closeSession(currentSession);
+        }
+        if (previousSession != null && previousSession != connectedSession && previousSession.isOpen()) {
+            closeSession(previousSession);
+        }
     }
 
     /**
      * Stops reconnect attempts and closes the active server session when present.
      *
-     * @throws IOException if the underlying websocket session cannot be closed
+     * @throws IOException declared by {@link Closeable}; close failures are published as diagnostics
      */
     @Override
-    public synchronized void close() throws IOException {
+    public void close() throws IOException {
+        if (!closeRequested.compareAndSet(false, true)) {
+            return;
+        }
+        closeDisposable.dispose();
+        scheduledReconnectAttempt.dispose();
+        closeSession(activeServerSession.getAndSet(null));
+    }
+
+    private void closeSession(final Session session) {
+        if (session == null || !session.isOpen()) {
+            return;
+        }
         try {
-            closed = true;
-            if (closeDisposable != null) {
-                closeDisposable.dispose();
-                closeDisposable = null;
-            }
-            if (reconnectDisposable != null) {
-                reconnectDisposable.dispose();
-                reconnectDisposable = null;
-            }
-            if (serverSession != null && serverSession.isOpen()) {
-                serverSession.close();
-                serverSession = null;
-            }
+            session.close();
         } catch (IOException e) {
             diagnosticPublisher.onNext(new DiagnosticMessage(DiagnosticLevel.ERROR, e.getMessage()));
         }

@@ -14,7 +14,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-@SuppressWarnings("synthetic-access")
 final class SubscriptionRouterTest {
 
     private SubscriptionRouter router;

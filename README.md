@@ -42,7 +42,7 @@ Last updated from `master` at 2026-07-06 03:59 UTC for commit `691c1bf`.
 ./gradlew clean check
 ```
 
-The CI workflow builds the library, runs tests, generates JaCoCo XML/HTML coverage, enforces coverage verification, uploads build artifacts, and publishes a Gradle build scan. CodeQL, SonarCloud, Dependency Review, Dependabot, Gradle dependency submission, cloud UI E2E tests, and GitHub Actions workflow linting are enabled for quality, supply-chain, deployment, and workflow scanning.
+The CI workflow builds the library, runs tests, generates JaCoCo XML/HTML coverage, enforces the configured `coverageMinimum`, uploads build artifacts, and publishes a Gradle build scan. CodeQL, SonarCloud, Dependency Review, Dependabot, Gradle dependency submission, cloud UI E2E tests, and GitHub Actions workflow linting are enabled for quality, supply-chain, deployment, and workflow scanning.
 
 ## Test and Coverage
 
@@ -78,6 +78,8 @@ Packages are deployed to GitHub Packages by the `Publish` workflow when a GitHub
 ```
 
 To run the same publish path locally, provide GitHub Packages credentials through `gpr.user`/`gpr.key` Gradle properties or `GITHUB_ACTOR`/`GITHUB_TOKEN` environment variables.
+
+The published library artifacts exclude the demo server and browser UI. The runnable application distribution still includes them through a separate demo jar used by `./gradlew run`, Docker, and Render.
 
 ## Basic Usage
 
@@ -149,8 +151,24 @@ PLAYWRIGHT_BASE_URL=https://reactivewebsockets.onrender.com npm run test:e2e
 4. `ReplyMessageHandler` publishes upstream replies into `ReplyMessageService`.
 5. Matching `ReplyMessage` values are sent back to subscribed websocket sessions.
 
+## Implementation Notes
+
+`SubscriptionRouter` keeps one shared stream per `MessageSubject`. The first local subscriber emits an upstream `Subscribe` request, additional local subscribers reuse the same stream, and the last disposal emits an upstream `Unsubscribe` request. Streams are stored in a `ConcurrentHashMap` so concurrent session callbacks resolve the same subject to the same shared stream.
+
+`RequestMessageHandler` serializes inbound websocket requests through an RxJava `PublishSubject` before processing them on the configured scheduler. Active data-source subscriptions are also kept in a `ConcurrentHashMap`; duplicate subscribe/unsubscribe commands are handled as idempotent operations and reported through diagnostics instead of throwing back into the websocket runtime.
+
+`SocketEndpoint` owns the per-session `Disposable` returned by the configured `SessionManager`. On close, it disposes the session handler, publishes a diagnostic message, and emits a close event through a serialized RxJava subject so reconnection code can react without depending on websocket container threading.
+
+`AutoReconnection` is lifecycle-driven rather than method-synchronized:
+
+- `closeRequested` is a one-way flag set by `close()` so timer callbacks stop retrying after shutdown begins.
+- `scheduledReconnectAttempt` is a `SerialDisposable`; replacing it cancels the previous reconnect timer, and disposing it cancels the current retry loop.
+- `activeServerSession` tracks the live websocket session owned by the controller. If a connection completes while `close()` is racing, the late session is closed immediately and cleared.
+
+This keeps the shared state small and explicit: reconnect timers, close events, and successful connections can arrive on different threads, but they coordinate through those lifecycle fields rather than a broad method-level monitor.
+
 ## Notes
 
 - Internal RxJava subjects are serialized for safe concurrent websocket callbacks.
-- Reconnection retry timers are disposed when `AutoReconnection.close()` is called.
+- Reconnection retry timers and late successful sessions are disposed when `AutoReconnection.close()` is called.
 - Timestamps use `java.time.Instant` and serialize as ISO-8601 strings.

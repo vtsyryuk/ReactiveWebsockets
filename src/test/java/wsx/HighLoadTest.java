@@ -18,7 +18,6 @@ import javax.websocket.Session;
 import java.util.ArrayList;
 import java.util.List;
 
-@SuppressWarnings({"synthetic-access"})
 final class HighLoadTest {
 
     private SocketEndpoint webappClient;
