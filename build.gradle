@@ -11,6 +11,10 @@ version = providers.gradleProperty('releaseVersion').orElse('2.0-SNAPSHOT').get(
 description = 'Reactive websocket subscription routing for Java.'
 
 def coverageClassExcludes = ['wsx/demo/**']
+def demoJarExcludes = ['wsx/demo/**', 'ui.html', 'ui.css']
+def coverageMinimum = providers.gradleProperty('coverageMinimum')
+        .map { new BigDecimal(it) }
+        .getOrElse(new BigDecimal('0.85'))
 
 java {
     toolchain {
@@ -57,6 +61,7 @@ tasks.withType(Test).configureEach {
 
 tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
+    exclude 'wsx/demo/**'
 }
 
 jacoco {
@@ -83,7 +88,7 @@ tasks.named('jacocoTestCoverageVerification') {
     violationRules {
         rule {
             limit {
-                minimum = 0.0
+                minimum = coverageMinimum
             }
         }
     }
@@ -92,6 +97,38 @@ tasks.named('jacocoTestCoverageVerification') {
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
     dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+tasks.named('jar') {
+    exclude demoJarExcludes
+}
+
+tasks.named('sourcesJar') {
+    exclude demoJarExcludes
+}
+
+tasks.register('demoJar', Jar) {
+    archiveClassifier = 'demo'
+    from(sourceSets.main.output) {
+        include 'wsx/demo/**'
+        include 'ui.html'
+        include 'ui.css'
+    }
+}
+
+tasks.named('startScripts') {
+    dependsOn tasks.named('demoJar')
+    classpath = files(tasks.named('demoJar')) + classpath
+}
+
+distributions {
+    main {
+        contents {
+            from(tasks.named('demoJar')) {
+                into 'lib'
+            }
+        }
+    }
 }
 
 sonar {

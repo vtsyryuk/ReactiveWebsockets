@@ -42,7 +42,7 @@ Last updated from `master` at 2026-07-06 03:59 UTC for commit `691c1bf`.
 ./gradlew clean check
 ```
 
-The CI workflow builds the library, runs tests, generates JaCoCo XML/HTML coverage, enforces coverage verification, uploads build artifacts, and publishes a Gradle build scan. CodeQL, SonarCloud, Dependency Review, Dependabot, Gradle dependency submission, cloud UI E2E tests, and GitHub Actions workflow linting are enabled for quality, supply-chain, deployment, and workflow scanning.
+The CI workflow builds the library, runs tests, generates JaCoCo XML/HTML coverage, enforces the configured `coverageMinimum`, uploads build artifacts, and publishes a Gradle build scan. CodeQL, SonarCloud, Dependency Review, Dependabot, Gradle dependency submission, cloud UI E2E tests, and GitHub Actions workflow linting are enabled for quality, supply-chain, deployment, and workflow scanning.
 
 ## Test and Coverage
 
@@ -78,6 +78,8 @@ Packages are deployed to GitHub Packages by the `Publish` workflow when a GitHub
 ```
 
 To run the same publish path locally, provide GitHub Packages credentials through `gpr.user`/`gpr.key` Gradle properties or `GITHUB_ACTOR`/`GITHUB_TOKEN` environment variables.
+
+The published library artifacts exclude the demo server and browser UI. The runnable application distribution still includes them through a separate demo jar used by `./gradlew run`, Docker, and Render.
 
 ## Basic Usage
 
