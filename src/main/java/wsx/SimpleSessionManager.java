@@ -28,7 +28,7 @@ public class SimpleSessionManager<T> implements SessionManager {
         this.messageHandlerFactory = Objects.requireNonNull(messageHandlerFactory, "messageHandlerFactory");
     }
 
-    // NOTE: this workaround is because of the custom tomcat'c websocket implementation
+    // Tomcat wraps message handlers; remove the registered wrapper when one points at our handler.
     private static MessageHandler getRegisteredHandler(final Session session, final MessageHandler handler) {
         for (MessageHandler h : session.getMessageHandlers()) {
             try {

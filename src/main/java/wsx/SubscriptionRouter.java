@@ -66,9 +66,9 @@ public class SubscriptionRouter implements DataSource {
     private Observable<ReplyMessage> createStream(final MessageSubject subject) {
         final Observable<ReplyMessage> subjectStream = replyStream.filter(msg -> msg.getSubject().equals(subject));
 
-        // INFO: caching message confirmation so that each new subscriber gets it
+        // Replay the first reply as a subscription confirmation for each local subscriber.
         final ConnectableObservable<ReplyMessage> confirmationStream = subjectStream.take(1).replay();
-        // INFO: filtering data stream out by skipping message confirmation
+        // Share later replies while at least one local subscriber remains active.
         final Observable<ReplyMessage> dataStream = subjectStream.skip(1).publish().refCount();
 
         final Observable<ReplyMessage> requestGenerator = Observable.<ReplyMessage>create(emitter -> {
