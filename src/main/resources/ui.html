@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ReactiveWebsockets demo</title>
+    <link rel="stylesheet" href="/ui.css">
+  </head>
+  <body>
+    <main>
+      <h1>ReactiveWebsockets demo</h1>
+      <p>Subscribe browser clients to fake websocket topics, publish replies, and watch the router emit upstream subscribe/unsubscribe requests only when needed.</p>
+
+      <div class="controls" aria-label="Subscription controls">
+        <label>
+          Client
+          <input id="client" value="alice">
+        </label>
+        <label>
+          Topic
+          <select id="topic"></select>
+        </label>
+        <label>
+          Reply content
+          <input id="content" value="price=42.10">
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="subscribe">Subscribe</button>
+        <button id="publish" class="secondary">Publish reply</button>
+        <button id="unsubscribe" class="secondary">Unsubscribe last</button>
+        <button id="simulate" class="secondary">Simulate shared topic</button>
+      </div>
+
+      <div id="status" class="status" role="status" aria-live="polite">Loading topics...</div>
+
+      <div class="grid">
+        <section>
+          <h2>State</h2>
+          <pre id="state">{}</pre>
+        </section>
+        <section>
+          <h2>Last response</h2>
+          <pre id="output">{}</pre>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const topic = document.querySelector("#topic");
+      const client = document.querySelector("#client");
+      const content = document.querySelector("#content");
+      const statePanel = document.querySelector("#state");
+      const output = document.querySelector("#output");
+      const status = document.querySelector("#status");
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const subscriptions = [];
+
+      function setBusy(isBusy) {
+        buttons.forEach((button) => {
+          button.disabled = isBusy;
+        });
+      }
+
+      function show(message, stateName) {
+        status.textContent = message;
+        status.dataset.state = stateName || "";
+      }
+
+      function render(data) {
+        output.textContent = JSON.stringify(data, null, 2);
+        const state = data.state || data.body?.state;
+        if (state) {
+          statePanel.textContent = JSON.stringify(state, null, 2);
+        }
+        const statusName = data.status || data.body?.status;
+        const subscription = data.subscription || data.body?.subscription;
+        if (subscription && subscription.id && statusName === "subscribed") {
+          subscriptions.push(subscription.id);
+        }
+        if (statusName) {
+          show(statusName, statusName);
+        }
+      }
+
+      async function readResponseBody(response) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          try {
+            return await response.json();
+          } catch (error) {
+            return { error: `Invalid JSON response: ${error.message}` };
+          }
+        }
+
+        const text = await response.text();
+        return text ? { message: text } : {};
+      }
+
+      async function call(path, options = {}) {
+        setBusy(true);
+        try {
+          const response = await fetch(path, options);
+          const body = await readResponseBody(response);
+          if (!response.ok) {
+            const error = body.error || body.message || `HTTP ${response.status}`;
+            const data = {
+              status: "error",
+              httpStatus: response.status,
+              httpStatusText: response.statusText,
+              error,
+              body,
+            };
+            render(data);
+            show(`HTTP ${response.status}: ${error}`, "error");
+            return data;
+          }
+
+          render(body);
+          return body;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const data = { status: "error", error: message };
+          render(data);
+          show(message, "error");
+          return data;
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function loadTopics() {
+        const data = await call("/api/topics");
+        if (!data.topics) {
+          return;
+        }
+        topic.innerHTML = "";
+        data.topics.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item;
+          option.textContent = item;
+          topic.append(option);
+        });
+        await call("/api/state");
+        show(`Loaded ${data.topics.length} topics`, "loaded");
+      }
+
+      document.querySelector("#subscribe").addEventListener("click", () => {
+        const params = new URLSearchParams({ client: client.value, topic: topic.value });
+        call(`/api/subscribe?${params}`, { method: "POST" });
+      });
+
+      document.querySelector("#publish").addEventListener("click", () => {
+        const params = new URLSearchParams({ topic: topic.value, content: content.value });
+        call(`/api/publish?${params}`, { method: "POST" });
+      });
+
+      document.querySelector("#unsubscribe").addEventListener("click", () => {
+        const subscriptionId = subscriptions.pop();
+        if (!subscriptionId) {
+          show("No active subscription in this browser session", "not_found");
+          return;
+        }
+        const params = new URLSearchParams({ subscriptionId });
+        call(`/api/unsubscribe?${params}`, { method: "POST" });
+      });
+
+      document.querySelector("#simulate").addEventListener("click", () => {
+        const params = new URLSearchParams({ topic: topic.value, clients: "alpha,beta,gamma" });
+        call(`/api/simulate?${params}`, { method: "POST" });
+      });
+
+      loadTopics().catch((error) => {
+        show(error.message, "error");
+      });
+    </script>
+  </body>
+</html>

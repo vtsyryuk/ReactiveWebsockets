@@ -5,3 +5,6 @@ target/
 node_modules/
 playwright-report/
 test-results/
+.idea/IntelliLang.xml
+.idea/gradle.xml
+.idea/workspace.xml
