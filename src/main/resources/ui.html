@@ -4,117 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ReactiveWebsockets demo</title>
-    <style>
-      :root {
-        color-scheme: light;
-        font-family: Arial, Helvetica, sans-serif;
-        background: #f7f8fa;
-        color: #20242a;
-      }
-
-      body {
-        margin: 0;
-      }
-
-      main {
-        max-width: 1040px;
-        margin: 0 auto;
-        padding: 32px 20px;
-      }
-
-      h1 {
-        margin: 0 0 8px;
-        font-size: 32px;
-        letter-spacing: 0;
-      }
-
-      p {
-        margin: 0 0 24px;
-        color: #4e5965;
-        line-height: 1.5;
-      }
-
-      .controls {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-        margin-bottom: 18px;
-      }
-
-      label {
-        display: grid;
-        gap: 6px;
-        font-weight: 700;
-        font-size: 14px;
-      }
-
-      select,
-      input,
-      button {
-        min-height: 42px;
-        border: 1px solid #c8d0d9;
-        border-radius: 6px;
-        padding: 8px 10px;
-        font: inherit;
-        background: #ffffff;
-      }
-
-      button {
-        border-color: #0f766e;
-        background: #0f766e;
-        color: #ffffff;
-        font-weight: 700;
-        cursor: pointer;
-      }
-
-      button.secondary {
-        border-color: #53616f;
-        background: #ffffff;
-        color: #24292f;
-      }
-
-      button:disabled {
-        cursor: wait;
-        opacity: 0.68;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-
-      .status {
-        min-height: 26px;
-        margin-bottom: 18px;
-        font-weight: 700;
-      }
-
-      .status[data-state="subscribed"],
-      .status[data-state="published"],
-      .status[data-state="simulated"] {
-        color: #116329;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 18px;
-      }
-
-      pre {
-        min-height: 260px;
-        overflow: auto;
-        margin: 0;
-        padding: 14px;
-        border: 1px solid #d0d7de;
-        border-radius: 6px;
-        background: #ffffff;
-        font-size: 13px;
-        line-height: 1.45;
-      }
-    </style>
+    <link rel="stylesheet" href="/ui.css">
   </head>
   <body>
     <main>
@@ -180,23 +70,60 @@
 
       function render(data) {
         output.textContent = JSON.stringify(data, null, 2);
-        if (data.state) {
-          statePanel.textContent = JSON.stringify(data.state, null, 2);
+        const state = data.state || data.body?.state;
+        if (state) {
+          statePanel.textContent = JSON.stringify(state, null, 2);
         }
-        if (data.subscription && data.subscription.id && data.status === "subscribed") {
-          subscriptions.push(data.subscription.id);
+        const statusName = data.status || data.body?.status;
+        const subscription = data.subscription || data.body?.subscription;
+        if (subscription && subscription.id && statusName === "subscribed") {
+          subscriptions.push(subscription.id);
         }
-        if (data.status) {
-          show(data.status, data.status);
+        if (statusName) {
+          show(statusName, statusName);
         }
+      }
+
+      async function readResponseBody(response) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          try {
+            return await response.json();
+          } catch (error) {
+            return { error: `Invalid JSON response: ${error.message}` };
+          }
+        }
+
+        const text = await response.text();
+        return text ? { message: text } : {};
       }
 
       async function call(path, options = {}) {
         setBusy(true);
         try {
           const response = await fetch(path, options);
-          const data = await response.json();
+          const body = await readResponseBody(response);
+          if (!response.ok) {
+            const error = body.error || body.message || `HTTP ${response.status}`;
+            const data = {
+              status: "error",
+              httpStatus: response.status,
+              httpStatusText: response.statusText,
+              error,
+              body,
+            };
+            render(data);
+            show(`HTTP ${response.status}: ${error}`, "error");
+            return data;
+          }
+
+          render(body);
+          return body;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const data = { status: "error", error: message };
           render(data);
+          show(message, "error");
           return data;
         } finally {
           setBusy(false);
@@ -205,6 +132,9 @@
 
       async function loadTopics() {
         const data = await call("/api/topics");
+        if (!data.topics) {
+          return;
+        }
         topic.innerHTML = "";
         data.topics.forEach((item) => {
           const option = document.createElement("option");

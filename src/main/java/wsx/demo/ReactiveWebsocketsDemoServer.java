@@ -2,6 +2,10 @@ package wsx.demo;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -13,6 +17,7 @@ import wsx.SubscriptionRouter;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Type;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -37,8 +42,7 @@ public final class ReactiveWebsocketsDemoServer {
     private static final String CONTENT_FIELD = "content";
     private static final List<String> TOPICS = List.of("prices", "orders", "alerts", "inventory");
     private static final Gson GSON = new GsonBuilder()
-            .registerTypeAdapter(Instant.class, (com.google.gson.JsonSerializer<Instant>) (
-                    src, typeOfSrc, context) -> new com.google.gson.JsonPrimitive(src.toString()))
+            .registerTypeAdapter(Instant.class, (JsonSerializer<Instant>) ReactiveWebsocketsDemoServer::serializeInstant)
             .create();
 
     private final ReplyMessageService replyMessageService = new ReplyMessageService();
@@ -65,26 +69,22 @@ public final class ReactiveWebsocketsDemoServer {
         try {
             String method = exchange.getRequestMethod();
             String path = exchange.getRequestURI().getPath();
-            if ("GET".equals(method) && "/".equals(path)) {
-                respondHtml(exchange, 200, ui());
-            } else if ("GET".equals(method) && "/api".equals(path)) {
-                respond(exchange, 200, routes());
-            } else if ("GET".equals(method) && "/health".equals(path)) {
-                respond(exchange, 200, new StatusResponse("ok"));
-            } else if ("GET".equals(method) && "/api/topics".equals(path)) {
-                respond(exchange, 200, topics());
-            } else if ("GET".equals(method) && "/api/state".equals(path)) {
-                respond(exchange, 200, state());
-            } else if ("POST".equals(method) && "/api/subscribe".equals(path)) {
-                respond(exchange, 200, subscribe(exchange.getRequestURI()));
-            } else if ("POST".equals(method) && "/api/publish".equals(path)) {
-                respond(exchange, 200, publish(exchange.getRequestURI()));
-            } else if ("POST".equals(method) && "/api/unsubscribe".equals(path)) {
-                respond(exchange, 200, unsubscribe(exchange.getRequestURI()));
-            } else if ("POST".equals(method) && "/api/simulate".equals(path)) {
-                respond(exchange, 200, simulate(exchange.getRequestURI()));
-            } else {
+            Route route = Route.match(method, path);
+            if (route == null) {
                 respond(exchange, 404, new ErrorResponse("not_found"));
+                return;
+            }
+            switch (route) {
+                case ROOT -> respondHtml(exchange, 200, ui());
+                case UI_CSS -> respondCss(exchange, 200, resource("/ui.css"));
+                case API -> respond(exchange, 200, routes());
+                case HEALTH -> respond(exchange, 200, new StatusResponse("ok"));
+                case TOPICS -> respond(exchange, 200, topics());
+                case STATE -> respond(exchange, 200, state());
+                case SUBSCRIBE -> respond(exchange, 200, subscribe(exchange.getRequestURI()));
+                case PUBLISH -> respond(exchange, 200, publish(exchange.getRequestURI()));
+                case UNSUBSCRIBE -> respond(exchange, 200, unsubscribe(exchange.getRequestURI()));
+                case SIMULATE -> respond(exchange, 200, simulate(exchange.getRequestURI()));
             }
         } catch (IllegalArgumentException ex) {
             respond(exchange, 400, new ErrorResponse(ex.getMessage()));
@@ -242,14 +242,26 @@ public final class ReactiveWebsocketsDemoServer {
     }
 
     private static String ui() {
-        try (var inputStream = ReactiveWebsocketsDemoServer.class.getResourceAsStream("/ui.html")) {
+        return resource("/ui.html");
+    }
+
+    private static String resource(String path) {
+        try (var inputStream = ReactiveWebsocketsDemoServer.class.getResourceAsStream(path)) {
             if (inputStream == null) {
-                throw new IllegalStateException("ui.html not found in resources");
+                throw new IllegalStateException(path.substring(1) + " not found in resources");
             }
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
+    }
+
+    private static void respondCss(HttpExchange exchange, int status, String body) {
+        respond(exchange, status, body, "text/css; charset=utf-8");
+    }
+
+    private static JsonElement serializeInstant(Instant src, Type typeOfSrc, JsonSerializationContext context) {
+        return new JsonPrimitive(src.toString());
     }
 
     private static final class DemoSubscription {
@@ -351,5 +363,35 @@ public final class ReactiveWebsocketsDemoServer {
 
     private record SimulatedResponse(String status, String topic, int clients, List<RequestView> requests,
                                      StateResponse state) {
+    }
+
+    private enum Route {
+        ROOT("GET", "/"),
+        UI_CSS("GET", "/ui.css"),
+        API("GET", "/api"),
+        HEALTH("GET", "/health"),
+        TOPICS("GET", "/api/topics"),
+        STATE("GET", "/api/state"),
+        SUBSCRIBE("POST", "/api/subscribe"),
+        PUBLISH("POST", "/api/publish"),
+        UNSUBSCRIBE("POST", "/api/unsubscribe"),
+        SIMULATE("POST", "/api/simulate");
+
+        private final String method;
+        private final String path;
+
+        Route(String method, String path) {
+            this.method = method;
+            this.path = path;
+        }
+
+        private static Route match(String method, String path) {
+            for (Route route : values()) {
+                if (route.method.equals(method) && route.path.equals(path)) {
+                    return route;
+                }
+            }
+            return null;
+        }
     }
 }
