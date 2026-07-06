@@ -35,8 +35,7 @@ public final class ServerEndpointConfigurator extends ServerEndpointConfig.Confi
      */
     @Override
     public void modifyHandshake(ServerEndpointConfig sec, HandshakeRequest request, HandshakeResponse response) {
-        HttpSession httpSession = (HttpSession) request.getHttpSession();
-        if (httpSession != null) {
+        if (request.getHttpSession() instanceof HttpSession httpSession) {
             sec.getUserProperties().put(HttpSession.class.getName(), httpSession);
         }
     }
@@ -52,7 +51,7 @@ public final class ServerEndpointConfigurator extends ServerEndpointConfig.Confi
     @Override
     public <T> T getEndpointInstance(Class<T> endpointClass) throws InstantiationException {
         if (endpointClass.equals(SocketEndpoint.class)) {
-            return ((T) socketEndpoint);
+            return endpointClass.cast(socketEndpoint);
         }
         return super.getEndpointInstance(endpointClass);
     }

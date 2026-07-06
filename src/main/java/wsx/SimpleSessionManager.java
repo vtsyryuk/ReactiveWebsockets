@@ -50,7 +50,6 @@ public class SimpleSessionManager<T> implements SessionManager {
      * @param session websocket session to attach to
      * @return disposable that detaches and closes the handler
      */
-    @SuppressWarnings("resource")
     @Override
     public Disposable attach(final Session session) {
         final CloseableMessageHandler<T> handler = messageHandlerFactory.create(session.getAsyncRemote());

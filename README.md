@@ -151,8 +151,24 @@ PLAYWRIGHT_BASE_URL=https://reactivewebsockets.onrender.com npm run test:e2e
 4. `ReplyMessageHandler` publishes upstream replies into `ReplyMessageService`.
 5. Matching `ReplyMessage` values are sent back to subscribed websocket sessions.
 
+## Implementation Notes
+
+`SubscriptionRouter` keeps one shared stream per `MessageSubject`. The first local subscriber emits an upstream `Subscribe` request, additional local subscribers reuse the same stream, and the last disposal emits an upstream `Unsubscribe` request. Streams are stored in a `ConcurrentHashMap` so concurrent session callbacks resolve the same subject to the same shared stream.
+
+`RequestMessageHandler` serializes inbound websocket requests through an RxJava `PublishSubject` before processing them on the configured scheduler. Active data-source subscriptions are also kept in a `ConcurrentHashMap`; duplicate subscribe/unsubscribe commands are handled as idempotent operations and reported through diagnostics instead of throwing back into the websocket runtime.
+
+`SocketEndpoint` owns the per-session `Disposable` returned by the configured `SessionManager`. On close, it disposes the session handler, publishes a diagnostic message, and emits a close event through a serialized RxJava subject so reconnection code can react without depending on websocket container threading.
+
+`AutoReconnection` is lifecycle-driven rather than method-synchronized:
+
+- `closeRequested` is a one-way flag set by `close()` so timer callbacks stop retrying after shutdown begins.
+- `scheduledReconnectAttempt` is a `SerialDisposable`; replacing it cancels the previous reconnect timer, and disposing it cancels the current retry loop.
+- `activeServerSession` tracks the live websocket session owned by the controller. If a connection completes while `close()` is racing, the late session is closed immediately and cleared.
+
+This keeps the shared state small and explicit: reconnect timers, close events, and successful connections can arrive on different threads, but they coordinate through those lifecycle fields rather than a broad method-level monitor.
+
 ## Notes
 
 - Internal RxJava subjects are serialized for safe concurrent websocket callbacks.
-- Reconnection retry timers are disposed when `AutoReconnection.close()` is called.
+- Reconnection retry timers and late successful sessions are disposed when `AutoReconnection.close()` is called.
 - Timestamps use `java.time.Instant` and serialize as ISO-8601 strings.

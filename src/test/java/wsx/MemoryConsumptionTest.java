@@ -15,7 +15,6 @@ import javax.websocket.MessageHandler;
 import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.Session;
 
-@SuppressWarnings({"synthetic-access"})
 final class MemoryConsumptionTest {
 
     private SocketEndpoint webappClient;

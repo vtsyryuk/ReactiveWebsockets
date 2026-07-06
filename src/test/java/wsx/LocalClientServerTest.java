@@ -16,7 +16,6 @@ import javax.websocket.RemoteEndpoint.Async;
 import javax.websocket.SendHandler;
 import javax.websocket.Session;
 
-@SuppressWarnings({"synthetic-access"})
 final class LocalClientServerTest {
 
     private SocketEndpoint webappClient;
