@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ReactiveWebsockets demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f7f8fa;
+        color: #20242a;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 32px;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 24px;
+        color: #4e5965;
+        line-height: 1.5;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      select,
+      input,
+      button {
+        min-height: 42px;
+        border: 1px solid #c8d0d9;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font: inherit;
+        background: #ffffff;
+      }
+
+      button {
+        border-color: #0f766e;
+        background: #0f766e;
+        color: #ffffff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        border-color: #53616f;
+        background: #ffffff;
+        color: #24292f;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.68;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .status {
+        min-height: 26px;
+        margin-bottom: 18px;
+        font-weight: 700;
+      }
+
+      .status[data-state="subscribed"],
+      .status[data-state="published"],
+      .status[data-state="simulated"] {
+        color: #116329;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+      }
+
+      pre {
+        min-height: 260px;
+        overflow: auto;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #ffffff;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ReactiveWebsockets demo</h1>
+      <p>Subscribe browser clients to fake websocket topics, publish replies, and watch the router emit upstream subscribe/unsubscribe requests only when needed.</p>
+
+      <div class="controls" aria-label="Subscription controls">
+        <label>
+          Client
+          <input id="client" value="alice">
+        </label>
+        <label>
+          Topic
+          <select id="topic"></select>
+        </label>
+        <label>
+          Reply content
+          <input id="content" value="price=42.10">
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="subscribe">Subscribe</button>
+        <button id="publish" class="secondary">Publish reply</button>
+        <button id="unsubscribe" class="secondary">Unsubscribe last</button>
+        <button id="simulate" class="secondary">Simulate shared topic</button>
+      </div>
+
+      <div id="status" class="status" role="status" aria-live="polite">Loading topics...</div>
+
+      <div class="grid">
+        <section>
+          <h2>State</h2>
+          <pre id="state">{}</pre>
+        </section>
+        <section>
+          <h2>Last response</h2>
+          <pre id="output">{}</pre>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const topic = document.querySelector("#topic");
+      const client = document.querySelector("#client");
+      const content = document.querySelector("#content");
+      const statePanel = document.querySelector("#state");
+      const output = document.querySelector("#output");
+      const status = document.querySelector("#status");
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const subscriptions = [];
+
+      function setBusy(isBusy) {
+        buttons.forEach((button) => {
+          button.disabled = isBusy;
+        });
+      }
+
+      function show(message, stateName) {
+        status.textContent = message;
+        status.dataset.state = stateName || "";
+      }
+
+      function render(data) {
+        output.textContent = JSON.stringify(data, null, 2);
+        if (data.state) {
+          statePanel.textContent = JSON.stringify(data.state, null, 2);
+        }
+        if (data.subscription && data.subscription.id && data.status === "subscribed") {
+          subscriptions.push(data.subscription.id);
+        }
+        if (data.status) {
+          show(data.status, data.status);
+        }
+      }
+
+      async function call(path, options = {}) {
+        setBusy(true);
+        try {
+          const response = await fetch(path, options);
+          const data = await response.json();
+          render(data);
+          return data;
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function loadTopics() {
+        const data = await call("/api/topics");
+        topic.innerHTML = "";
+        data.topics.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item;
+          option.textContent = item;
+          topic.append(option);
+        });
+        await call("/api/state");
+        show(`Loaded ${data.topics.length} topics`, "loaded");
+      }
+
+      document.querySelector("#subscribe").addEventListener("click", () => {
+        const params = new URLSearchParams({ client: client.value, topic: topic.value });
+        call(`/api/subscribe?${params}`, { method: "POST" });
+      });
+
+      document.querySelector("#publish").addEventListener("click", () => {
+        const params = new URLSearchParams({ topic: topic.value, content: content.value });
+        call(`/api/publish?${params}`, { method: "POST" });
+      });
+
+      document.querySelector("#unsubscribe").addEventListener("click", () => {
+        const subscriptionId = subscriptions.pop();
+        if (!subscriptionId) {
+          show("No active subscription in this browser session", "not_found");
+          return;
+        }
+        const params = new URLSearchParams({ subscriptionId });
+        call(`/api/unsubscribe?${params}`, { method: "POST" });
+      });
+
+      document.querySelector("#simulate").addEventListener("click", () => {
+        const params = new URLSearchParams({ topic: topic.value, clients: "alpha,beta,gamma" });
+        call(`/api/simulate?${params}`, { method: "POST" });
+      });
+
+      loadTopics().catch((error) => {
+        show(error.message, "error");
+      });
+    </script>
+  </body>
+</html>

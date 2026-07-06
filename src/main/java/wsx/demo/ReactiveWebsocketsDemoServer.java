@@ -1,5 +1,7 @@
 package wsx.demo;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -28,7 +30,16 @@ import java.util.concurrent.Executors;
 public final class ReactiveWebsocketsDemoServer {
 
     private static final int DEFAULT_PORT = 8080;
+    private static final String TOPIC_FIELD = "topic";
+    private static final String CLIENT_FIELD = "client";
+    private static final String CLIENTS_FIELD = "clients";
+    private static final String SUBSCRIPTION_ID_FIELD = "subscriptionId";
+    private static final String CONTENT_FIELD = "content";
     private static final List<String> TOPICS = List.of("prices", "orders", "alerts", "inventory");
+    private static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(Instant.class, (com.google.gson.JsonSerializer<Instant>) (
+                    src, typeOfSrc, context) -> new com.google.gson.JsonPrimitive(src.toString()))
+            .create();
 
     private final ReplyMessageService replyMessageService = new ReplyMessageService();
     private final SubscriptionRouter router = new SubscriptionRouter(replyMessageService.getStream());
@@ -59,7 +70,7 @@ public final class ReactiveWebsocketsDemoServer {
             } else if ("GET".equals(method) && "/api".equals(path)) {
                 respond(exchange, 200, routes());
             } else if ("GET".equals(method) && "/health".equals(path)) {
-                respond(exchange, 200, "{\"status\":\"ok\"}");
+                respond(exchange, 200, new StatusResponse("ok"));
             } else if ("GET".equals(method) && "/api/topics".equals(path)) {
                 respond(exchange, 200, topics());
             } else if ("GET".equals(method) && "/api/state".equals(path)) {
@@ -73,66 +84,53 @@ public final class ReactiveWebsocketsDemoServer {
             } else if ("POST".equals(method) && "/api/simulate".equals(path)) {
                 respond(exchange, 200, simulate(exchange.getRequestURI()));
             } else {
-                respond(exchange, 404, "{\"error\":\"not_found\"}");
+                respond(exchange, 404, new ErrorResponse("not_found"));
             }
         } catch (IllegalArgumentException ex) {
-            respond(exchange, 400, "{\"error\":\"" + json(ex.getMessage()) + "\"}");
+            respond(exchange, 400, new ErrorResponse(ex.getMessage()));
         } catch (Exception ex) {
-            respond(exchange, 500, "{\"error\":\"" + json(ex.getMessage()) + "\"}");
+            respond(exchange, 500, new ErrorResponse(ex.getMessage()));
         } finally {
             exchange.close();
         }
     }
 
-    private String subscribe(URI uri) {
-        Map<String, String> query = query(uri);
-        String topic = required(query, "topic");
-        String client = query.getOrDefault("client", "browser");
-        MessageSubject subject = MessageSubject.of("topic", topic);
-        String id = UUID.randomUUID().toString();
-        DemoSubscription subscription = new DemoSubscription(id, client, topic, Instant.now());
-        Disposable disposable = router.getDataStream(subject).subscribe(subscription.replies::add);
-        subscription.disposable = disposable;
-        subscriptions.put(id, subscription);
-        return "{\"status\":\"subscribed\",\"subscription\":" + subscription.json() + ",\"state\":" + state() + "}";
+    private SubscribeResponse subscribe(URI uri) {
+        SubscribeRequest request = SubscribeRequest.from(query(uri));
+        DemoSubscription subscription = createSubscription(request);
+        return new SubscribeResponse("subscribed", subscription.snapshot(), state());
     }
 
-    private String publish(URI uri) {
-        Map<String, String> query = query(uri);
-        String topic = required(query, "topic");
-        String content = query.getOrDefault("content", "tick-" + Instant.now());
-        ReplyMessage reply = ReplyMessage.create(MessageSubject.of("topic", topic), content);
+    private PublishResponse publish(URI uri) {
+        PublishRequest request = PublishRequest.from(query(uri));
+        ReplyMessage reply = ReplyMessage.create(topicSubject(request.topic()), request.content());
         replyMessageService.getPublisher().onNext(reply);
-        return "{\"status\":\"published\",\"reply\":" + replyJson(reply) + ",\"state\":" + state() + "}";
+        return new PublishResponse("published", toReplyView(reply), state());
     }
 
-    private String unsubscribe(URI uri) {
-        Map<String, String> query = query(uri);
-        String id = required(query, "subscriptionId");
+    private UnsubscribeResponse unsubscribe(URI uri) {
+        UnsubscribeRequest request = UnsubscribeRequest.from(query(uri));
+        String id = request.subscriptionId();
         DemoSubscription subscription = subscriptions.remove(id);
         if (subscription == null) {
-            return "{\"status\":\"not_found\",\"subscriptionId\":\"" + json(id) + "\",\"state\":" + state() + "}";
+            return new UnsubscribeResponse("not_found", id, null, state());
         }
         subscription.close();
-        return "{\"status\":\"unsubscribed\",\"subscription\":" + subscription.json() + ",\"state\":" + state() + "}";
+        return new UnsubscribeResponse("unsubscribed", id, subscription.snapshot(), state());
     }
 
-    private String simulate(URI uri) {
-        Map<String, String> query = query(uri);
-        String topic = query.getOrDefault("topic", "prices");
-        String[] clients = query.getOrDefault("clients", "alpha,beta,gamma").split(",");
+    private SimulatedResponse simulate(URI uri) {
+        SimulateRequest request = SimulateRequest.from(query(uri));
         List<DemoSubscription> created = new ArrayList<>();
-        for (String rawClient : clients) {
-            String client = rawClient.trim();
+        for (String client : request.clients()) {
             if (!client.isEmpty()) {
-                Map<String, String> subscribeQuery = Map.of("topic", topic, "client", client);
-                DemoSubscription subscription = createSubscription(subscribeQuery);
+                DemoSubscription subscription = createSubscription(new SubscribeRequest(request.topic(), client));
                 created.add(subscription);
             }
         }
 
-        ReplyMessage first = ReplyMessage.create(MessageSubject.of("topic", topic), "confirmation:" + topic);
-        ReplyMessage second = ReplyMessage.create(MessageSubject.of("topic", topic), "update:" + topic);
+        ReplyMessage first = ReplyMessage.create(topicSubject(request.topic()), "confirmation:" + request.topic());
+        ReplyMessage second = ReplyMessage.create(topicSubject(request.topic()), "update:" + request.topic());
         replyMessageService.getPublisher().onNext(first);
         replyMessageService.getPublisher().onNext(second);
 
@@ -141,73 +139,58 @@ public final class ReactiveWebsocketsDemoServer {
             subscription.close();
         }
 
-        return "{\"status\":\"simulated\",\"topic\":\"" + json(topic) + "\",\"clients\":" + created.size()
-                + ",\"requests\":" + requestsJson() + ",\"state\":" + state() + "}";
+        return new SimulatedResponse("simulated", request.topic(), created.size(), requests(), state());
     }
 
-    private DemoSubscription createSubscription(Map<String, String> query) {
-        String topic = required(query, "topic");
-        String client = query.getOrDefault("client", "browser");
+    private DemoSubscription createSubscription(SubscribeRequest request) {
         String id = UUID.randomUUID().toString();
-        DemoSubscription subscription = new DemoSubscription(id, client, topic, Instant.now());
-        subscription.disposable = router.getDataStream(MessageSubject.of("topic", topic)).subscribe(subscription.replies::add);
+        DemoSubscription subscription = new DemoSubscription(id, request.client(), request.topic(), Instant.now());
+        subscription.disposable = router.getDataStream(topicSubject(request.topic())).subscribe(subscription.replies::add);
         subscriptions.put(id, subscription);
         return subscription;
     }
 
-    private String state() {
-        List<String> subscriptionJson = subscriptions.values().stream()
+    private StateResponse state() {
+        return new StateResponse(subscriptions(), requests());
+    }
+
+    private RoutesResponse routes() {
+        return new RoutesResponse("ReactiveWebsockets demo", List.of(
+                "GET /api/topics",
+                "POST /api/subscribe?client=alice&topic=prices",
+                "POST /api/publish?topic=prices&content=42.10",
+                "POST /api/unsubscribe?subscriptionId=<subscription-id>",
+                "POST /api/simulate?topic=prices"
+        ));
+    }
+
+    private TopicsResponse topics() {
+        return new TopicsResponse(TOPICS);
+    }
+
+    private List<RequestView> requests() {
+        return upstreamRequests.stream()
+                .map(ReactiveWebsocketsDemoServer::toRequestView)
+                .toList();
+    }
+
+    private List<SubscriptionView> subscriptions() {
+        return subscriptions.values().stream()
                 .sorted(Comparator.comparing(DemoSubscription::createdAt))
-                .map(DemoSubscription::json)
+                .map(DemoSubscription::snapshot)
                 .toList();
-        return "{\"subscriptions\":[" + String.join(",", subscriptionJson) + "],\"upstreamRequests\":"
-                + requestsJson() + "}";
     }
 
-    private String routes() {
-        return """
-                {
-                  "name": "ReactiveWebsockets demo",
-                  "examples": [
-                    "GET /api/topics",
-                    "POST /api/subscribe?client=alice&topic=prices",
-                    "POST /api/publish?topic=prices&content=42.10",
-                    "POST /api/unsubscribe?subscriptionId=<subscription-id>",
-                    "POST /api/simulate?topic=prices"
-                  ]
-                }
-                """;
+    private static RequestView toRequestView(RequestMessage request) {
+        return new RequestView(request.getContent().getValue(), request.getSubject().getFields(), request.getTimestamp());
     }
 
-    private String topics() {
-        List<String> values = TOPICS.stream()
-                .map(topic -> "\"" + json(topic) + "\"")
-                .toList();
-        return "{\"topics\":[" + String.join(",", values) + "]}";
+    private static ReplyView toReplyView(ReplyMessage reply) {
+        return new ReplyView(reply.getContent(), reply.getSubject().getFields(), reply.getTimestamp());
     }
 
-    private String requestsJson() {
-        List<String> entries = upstreamRequests.stream()
-                .map(ReactiveWebsocketsDemoServer::requestJson)
-                .toList();
-        return "[" + String.join(",", entries) + "]";
-    }
-
-    private static String requestJson(RequestMessage request) {
-        return "{\"command\":\"" + request.getContent() + "\",\"subject\":" + subjectJson(request.getSubject())
-                + ",\"timestamp\":\"" + request.getTimestamp() + "\"}";
-    }
-
-    private static String replyJson(ReplyMessage reply) {
-        return "{\"content\":\"" + json(reply.getContent()) + "\",\"subject\":" + subjectJson(reply.getSubject())
-                + ",\"timestamp\":\"" + reply.getTimestamp() + "\"}";
-    }
-
-    private static String subjectJson(MessageSubject subject) {
-        List<String> fields = new ArrayList<>();
-        subject.getFields().forEach((key, value) ->
-                fields.add("\"" + json(key) + "\":\"" + json(value) + "\""));
-        return "{" + String.join(",", fields) + "}";
+    private static MessageSubject topicSubject(String topic) {
+        return MessageSubject.of(TOPIC_FIELD, topic);
     }
 
     private static Map<String, String> query(URI uri) {
@@ -239,6 +222,10 @@ public final class ReactiveWebsocketsDemoServer {
         respond(exchange, status, body, "application/json; charset=utf-8");
     }
 
+    private static void respond(HttpExchange exchange, int status, Object body) {
+        respond(exchange, status, GSON.toJson(body));
+    }
+
     private static void respondHtml(HttpExchange exchange, int status, String body) {
         respond(exchange, status, body, "text/html; charset=utf-8");
     }
@@ -254,266 +241,15 @@ public final class ReactiveWebsocketsDemoServer {
         }
     }
 
-    private static String json(String value) {
-        return value == null ? "" : value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r");
-    }
-
     private static String ui() {
-        return """
-                <!doctype html>
-                <html lang="en">
-                  <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <title>ReactiveWebsockets demo</title>
-                    <style>
-                      :root {
-                        color-scheme: light;
-                        font-family: Arial, Helvetica, sans-serif;
-                        background: #f7f8fa;
-                        color: #20242a;
-                      }
-
-                      body {
-                        margin: 0;
-                      }
-
-                      main {
-                        max-width: 1040px;
-                        margin: 0 auto;
-                        padding: 32px 20px;
-                      }
-
-                      h1 {
-                        margin: 0 0 8px;
-                        font-size: 32px;
-                        letter-spacing: 0;
-                      }
-
-                      p {
-                        margin: 0 0 24px;
-                        color: #4e5965;
-                        line-height: 1.5;
-                      }
-
-                      .controls {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                        gap: 16px;
-                        margin-bottom: 18px;
-                      }
-
-                      label {
-                        display: grid;
-                        gap: 6px;
-                        font-weight: 700;
-                        font-size: 14px;
-                      }
-
-                      select,
-                      input,
-                      button {
-                        min-height: 42px;
-                        border: 1px solid #c8d0d9;
-                        border-radius: 6px;
-                        padding: 8px 10px;
-                        font: inherit;
-                        background: #ffffff;
-                      }
-
-                      button {
-                        border-color: #0f766e;
-                        background: #0f766e;
-                        color: #ffffff;
-                        font-weight: 700;
-                        cursor: pointer;
-                      }
-
-                      button.secondary {
-                        border-color: #53616f;
-                        background: #ffffff;
-                        color: #24292f;
-                      }
-
-                      button:disabled {
-                        cursor: wait;
-                        opacity: 0.68;
-                      }
-
-                      .actions {
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 10px;
-                        margin-bottom: 20px;
-                      }
-
-                      .status {
-                        min-height: 26px;
-                        margin-bottom: 18px;
-                        font-weight: 700;
-                      }
-
-                      .status[data-state="subscribed"],
-                      .status[data-state="published"],
-                      .status[data-state="simulated"] {
-                        color: #116329;
-                      }
-
-                      .grid {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                        gap: 18px;
-                      }
-
-                      pre {
-                        min-height: 260px;
-                        overflow: auto;
-                        margin: 0;
-                        padding: 14px;
-                        border: 1px solid #d0d7de;
-                        border-radius: 6px;
-                        background: #ffffff;
-                        font-size: 13px;
-                        line-height: 1.45;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <main>
-                      <h1>ReactiveWebsockets demo</h1>
-                      <p>Subscribe browser clients to fake websocket topics, publish replies, and watch the router emit upstream subscribe/unsubscribe requests only when needed.</p>
-
-                      <div class="controls" aria-label="Subscription controls">
-                        <label>
-                          Client
-                          <input id="client" value="alice">
-                        </label>
-                        <label>
-                          Topic
-                          <select id="topic"></select>
-                        </label>
-                        <label>
-                          Reply content
-                          <input id="content" value="price=42.10">
-                        </label>
-                      </div>
-
-                      <div class="actions">
-                        <button id="subscribe">Subscribe</button>
-                        <button id="publish" class="secondary">Publish reply</button>
-                        <button id="unsubscribe" class="secondary">Unsubscribe last</button>
-                        <button id="simulate" class="secondary">Simulate shared topic</button>
-                      </div>
-
-                      <div id="status" class="status" role="status" aria-live="polite">Loading topics...</div>
-
-                      <div class="grid">
-                        <section>
-                          <h2>State</h2>
-                          <pre id="state">{}</pre>
-                        </section>
-                        <section>
-                          <h2>Last response</h2>
-                          <pre id="output">{}</pre>
-                        </section>
-                      </div>
-                    </main>
-
-                    <script>
-                      const topic = document.querySelector("#topic");
-                      const client = document.querySelector("#client");
-                      const content = document.querySelector("#content");
-                      const statePanel = document.querySelector("#state");
-                      const output = document.querySelector("#output");
-                      const status = document.querySelector("#status");
-                      const buttons = Array.from(document.querySelectorAll("button"));
-                      const subscriptions = [];
-
-                      function setBusy(isBusy) {
-                        buttons.forEach((button) => {
-                          button.disabled = isBusy;
-                        });
-                      }
-
-                      function show(message, stateName) {
-                        status.textContent = message;
-                        status.dataset.state = stateName || "";
-                      }
-
-                      function render(data) {
-                        output.textContent = JSON.stringify(data, null, 2);
-                        if (data.state) {
-                          statePanel.textContent = JSON.stringify(data.state, null, 2);
-                        }
-                        if (data.subscription && data.subscription.id && data.status === "subscribed") {
-                          subscriptions.push(data.subscription.id);
-                        }
-                        if (data.status) {
-                          show(data.status, data.status);
-                        }
-                      }
-
-                      async function call(path, options = {}) {
-                        setBusy(true);
-                        try {
-                          const response = await fetch(path, options);
-                          const data = await response.json();
-                          render(data);
-                          return data;
-                        } finally {
-                          setBusy(false);
-                        }
-                      }
-
-                      async function loadTopics() {
-                        const data = await call("/api/topics");
-                        topic.innerHTML = "";
-                        data.topics.forEach((item) => {
-                          const option = document.createElement("option");
-                          option.value = item;
-                          option.textContent = item;
-                          topic.append(option);
-                        });
-                        await call("/api/state");
-                        show(`Loaded ${data.topics.length} topics`, "loaded");
-                      }
-
-                      document.querySelector("#subscribe").addEventListener("click", () => {
-                        const params = new URLSearchParams({ client: client.value, topic: topic.value });
-                        call(`/api/subscribe?${params}`, { method: "POST" });
-                      });
-
-                      document.querySelector("#publish").addEventListener("click", () => {
-                        const params = new URLSearchParams({ topic: topic.value, content: content.value });
-                        call(`/api/publish?${params}`, { method: "POST" });
-                      });
-
-                      document.querySelector("#unsubscribe").addEventListener("click", () => {
-                        const subscriptionId = subscriptions.pop();
-                        if (!subscriptionId) {
-                          show("No active subscription in this browser session", "not_found");
-                          return;
-                        }
-                        const params = new URLSearchParams({ subscriptionId });
-                        call(`/api/unsubscribe?${params}`, { method: "POST" });
-                      });
-
-                      document.querySelector("#simulate").addEventListener("click", () => {
-                        const params = new URLSearchParams({ topic: topic.value, clients: "alpha,beta,gamma" });
-                        call(`/api/simulate?${params}`, { method: "POST" });
-                      });
-
-                      loadTopics().catch((error) => {
-                        show(error.message, "error");
-                      });
-                    </script>
-                  </body>
-                </html>
-                """;
+        try (var inputStream = ReactiveWebsocketsDemoServer.class.getResourceAsStream("/ui.html")) {
+            if (inputStream == null) {
+                throw new IllegalStateException("ui.html not found in resources");
+            }
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
     }
 
     private static final class DemoSubscription {
@@ -541,14 +277,79 @@ public final class ReactiveWebsocketsDemoServer {
             }
         }
 
-        private String json() {
-            List<String> replyJson = replies.stream()
-                    .map(ReactiveWebsocketsDemoServer::replyJson)
-                    .toList();
-            return "{\"id\":\"" + ReactiveWebsocketsDemoServer.json(id) + "\",\"client\":\""
-                    + ReactiveWebsocketsDemoServer.json(client) + "\",\"topic\":\""
-                    + ReactiveWebsocketsDemoServer.json(topic)
-                    + "\",\"createdAt\":\"" + createdAt + "\",\"replies\":[" + String.join(",", replyJson) + "]}";
+        private SubscriptionView snapshot() {
+            return new SubscriptionView(id, client, topic, createdAt, replies.stream()
+                    .map(ReactiveWebsocketsDemoServer::toReplyView)
+                    .toList());
         }
+    }
+
+    private record SubscribeRequest(String topic, String client) {
+        private static SubscribeRequest from(Map<String, String> query) {
+            return new SubscribeRequest(required(query, TOPIC_FIELD), query.getOrDefault(CLIENT_FIELD, "browser"));
+        }
+    }
+
+    private record PublishRequest(String topic, String content) {
+        private static PublishRequest from(Map<String, String> query) {
+            return new PublishRequest(required(query, TOPIC_FIELD), query.getOrDefault(CONTENT_FIELD,
+                    "tick-" + Instant.now()));
+        }
+    }
+
+    private record UnsubscribeRequest(String subscriptionId) {
+        private static UnsubscribeRequest from(Map<String, String> query) {
+            return new UnsubscribeRequest(required(query, SUBSCRIPTION_ID_FIELD));
+        }
+    }
+
+    private record SimulateRequest(String topic, List<String> clients) {
+        private static SimulateRequest from(Map<String, String> query) {
+            String topic = query.getOrDefault(TOPIC_FIELD, "prices");
+            List<String> clients = java.util.Arrays.stream(query.getOrDefault(CLIENTS_FIELD, "alpha,beta,gamma").split(","))
+                    .map(String::trim)
+                    .filter(client -> !client.isEmpty())
+                    .toList();
+            return new SimulateRequest(topic, clients);
+        }
+    }
+
+    private record RoutesResponse(String name, List<String> examples) {
+    }
+
+    private record StatusResponse(String status) {
+    }
+
+    private record ErrorResponse(String error) {
+    }
+
+    private record TopicsResponse(List<String> topics) {
+    }
+
+    private record RequestView(String command, Map<String, String> subject, Instant timestamp) {
+    }
+
+    private record ReplyView(String content, Map<String, String> subject, Instant timestamp) {
+    }
+
+    private record SubscriptionView(String id, String client, String topic, Instant createdAt,
+                                    List<ReplyView> replies) {
+    }
+
+    private record StateResponse(List<SubscriptionView> subscriptions, List<RequestView> upstreamRequests) {
+    }
+
+    private record SubscribeResponse(String status, SubscriptionView subscription, StateResponse state) {
+    }
+
+    private record PublishResponse(String status, ReplyView reply, StateResponse state) {
+    }
+
+    private record UnsubscribeResponse(String status, String subscriptionId, SubscriptionView subscription,
+                                       StateResponse state) {
+    }
+
+    private record SimulatedResponse(String status, String topic, int clients, List<RequestView> requests,
+                                     StateResponse state) {
     }
 }
