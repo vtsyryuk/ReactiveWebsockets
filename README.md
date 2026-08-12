@@ -16,9 +16,9 @@ ReactiveWebsockets is a small Java library for routing websocket subscribe/unsub
 
 | Build | Line Coverage | Branch Coverage | Instruction Coverage | Workflow Run |
 | --- | ---: | ---: | ---: | --- |
-| ✅ Passing | 98.21% | 87.84% | 98.03% | [#42](https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/29199762594) |
+| ✅ Passing | 98.21% | 87.84% | 98.03% | [#53](https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/31558668478) |
 
-Last updated from `master` at 2026-07-12 16:15 UTC for commit `9d8ed16`.
+Last updated from `master` at 2026-08-12 03:00 UTC for commit `ed54a0b`.
 <!-- ci-status:end -->
 
 ## Project Links
