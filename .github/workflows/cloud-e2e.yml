@@ -37,6 +37,27 @@ jobs:
       - name: Install Chromium
         run: ./node_modules/.bin/playwright install --with-deps chromium
 
+      - name: Wait for cloud demo readiness
+        run: |
+          health_url="${PLAYWRIGHT_BASE_URL%/}/health"
+          deadline=$((SECONDS + 300))
+          attempt=1
+
+          while (( SECONDS < deadline )); do
+            echo "Readiness attempt ${attempt}: ${health_url}"
+            response="$(curl --fail --silent --show-error --max-time 30 "${health_url}" || true)"
+            if jq -e '.status == "ok"' <<<"${response}" >/dev/null 2>&1; then
+              echo "Cloud demo is ready."
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            sleep 5
+          done
+
+          echo "::error::Cloud demo did not become ready within 5 minutes."
+          exit 1
+
       - name: Run cloud UI tests
         run: npm run test:e2e
 
