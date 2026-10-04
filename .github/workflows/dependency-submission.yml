@@ -33,7 +33,7 @@ jobs:
       - name: Submit dependency graph
         id: dependency-submission
         continue-on-error: true
-        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        uses: gradle/actions/dependency-submission@3f5f9adaf7d9fecd50b5935e54106014257a94e6
 
       - name: Dependency graph disabled notice
         if: steps.dependency-submission.outcome == 'failure'
