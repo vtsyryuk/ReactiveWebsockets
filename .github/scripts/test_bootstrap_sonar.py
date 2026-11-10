@@ -124,6 +124,23 @@ class BootstrapTests(unittest.TestCase):
         with patch.object(bootstrap, "sonar", side_effect=[existing, (204, {}), existing]), self.assertRaisesRegex(RuntimeError, "verification failed"):
             bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
 
+    def test_authorized_rust_repair_only_removes_the_conflicting_non_primary_branch(self):
+        conflicting = (200, {"branches": [{"name": "master", "isMain": True}, {"name": "main", "isMain": False}]})
+        aligned = (200, {"branches": [{"name": "main", "isMain": True}]})
+        with patch.dict(os.environ, {"REMOVE_RUST_CONFLICT": "true"}), patch.object(bootstrap, "sonar", side_effect=[conflicting, (204, {}), (204, {}), aligned]) as api, patch("sys.stdout", io.StringIO()):
+            bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
+        deletion = api.call_args_list[1]
+        self.assertEqual(deletion.args[0], "project_branches/delete")
+        self.assertEqual(deletion.args[2], {"project": "vtsyryuk_rust-playground", "branch": "main"})
+        self.assertEqual(api.call_args_list[2].args[0], "project_branches/rename")
+        with patch.dict(os.environ, {"REMOVE_RUST_CONFLICT": "true"}), patch.object(bootstrap, "sonar", return_value=aligned) as api:
+            bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
+        self.assertEqual(api.call_count, 1)
+        for name, current in [("CppPlayground", "master"), ("rust-playground", "develop")]:
+            with patch.dict(os.environ, {"REMOVE_RUST_CONFLICT": "true"}), patch.object(bootstrap, "sonar") as api, self.assertRaisesRegex(RuntimeError, "conflicts"):
+                bootstrap.remove_authorized_rust_conflict(name, TEST_TOKEN, current)
+            api.assert_not_called()
+
     def test_activation_uses_dedicated_api_and_preserves_matching_gate(self):
         branch = (200, {"branches": [{"name": "master", "isMain": True}]})
         replies = [branch, (204, {}), (200, {"qualityGate": {"id": 9}})]

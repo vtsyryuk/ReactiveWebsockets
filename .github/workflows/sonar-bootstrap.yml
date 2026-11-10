@@ -12,6 +12,10 @@ on:
         description: Comma-separated approved repository names; blank selects all twelve
         type: string
         default: ''
+      remove_rust_conflict:
+        description: Permanently remove conflicting Rust SonarCloud main scan history before alignment
+        type: boolean
+        default: false
       public_keys:
         description: GitHub public encryption keys for the ten approved recipient repositories
         type: string
@@ -41,6 +45,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           BOOTSTRAP_PHASE: ${{ inputs.phase }}
           TARGET_PROJECTS: ${{ inputs.projects }}
+          REMOVE_RUST_CONFLICT: ${{ inputs.remove_rust_conflict }}
           REPOSITORY_PUBLIC_KEYS: ${{ inputs.public_keys }}
         run: python .github/scripts/bootstrap-sonar.py
       - name: Export GitHub-encrypted values
