@@ -1,6 +1,5 @@
 package wsx;
 
-import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -18,8 +17,8 @@ final class SpringEndpointWiringTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.registerBean(ReplyStreamSessionManager.class,
                     () -> new ReplyStreamSessionManager(remote -> replyHandler));
-            context.registerBean("diagnosticPublisher", Observer.class,
-                    () -> PublishSubject.<DiagnosticMessage>create());
+            context.getBeanFactory().registerSingleton("diagnosticPublisher",
+                    PublishSubject.<DiagnosticMessage>create());
             context.register(SocketEndpoint.class);
             context.refresh();
 
@@ -43,8 +42,8 @@ final class SpringEndpointWiringTest {
                     () -> new RequestStreamSessionManager(remote -> requestHandler));
             context.registerBean(ReplyStreamSessionManager.class,
                     () -> new ReplyStreamSessionManager(remote -> replyHandler));
-            context.registerBean("diagnosticPublisher", Observer.class,
-                    () -> PublishSubject.<DiagnosticMessage>create());
+            context.getBeanFactory().registerSingleton("diagnosticPublisher",
+                    PublishSubject.<DiagnosticMessage>create());
             context.register(SocketEndpoint.class);
             context.refresh();
 
