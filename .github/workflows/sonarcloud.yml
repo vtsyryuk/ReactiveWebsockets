@@ -41,6 +41,15 @@ jobs:
       - name: Build, test, and generate JaCoCo coverage
         run: |
           ./gradlew clean build jacocoTestReport --no-daemon
+      - name: Set up Python for administrative workflow tests
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Test administrative workflows and collect coverage
+        run: |
+          python -m pip install --only-binary :all: coverage==7.10.7 PyNaCl==1.6.2
+          python -m coverage run --source=.github/scripts -m unittest discover -s .github/scripts -p test_bootstrap_sonar.py
+          python -m coverage xml -o build/reports/python/coverage.xml
       - name: Upload scanner inputs
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

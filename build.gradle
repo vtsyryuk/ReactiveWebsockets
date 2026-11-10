@@ -141,7 +141,9 @@ sonar {
                 .get()
         property 'sonar.coverage.jacoco.xmlReportPaths',
                 layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile.path
-        property 'sonar.exclusions', 'src/main/java/wsx/demo/**'
+        property 'sonar.python.coverage.reportPaths', 'build/reports/python/coverage.xml'
+        property 'sonar.tests', 'src/test/java,.github/scripts/test_bootstrap_sonar.py'
+        property 'sonar.exclusions', 'src/main/java/wsx/demo/**,.github/scripts/test_bootstrap_sonar.py'
         property 'sonar.coverage.exclusions', 'src/main/java/wsx/demo/**'
     }
 }
