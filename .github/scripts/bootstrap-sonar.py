@@ -75,9 +75,19 @@ def seal_for_repositories(token, public_keys):
     return result
 
 
-def audit_projects(token):
+def selected_projects():
+    requested = os.environ.get("TARGET_PROJECTS", "")
+    if not requested:
+        return list(REPOS)
+    names = [name.strip() for name in requested.split(",")]
+    if len(set(names)) != len(names) or not set(names).issubset(REPOS):
+        raise RuntimeError("Target projects must be unique approved repository names")
+    return names
+
+
+def audit_projects(token, names):
     failures = []
-    for name in REPOS:
+    for name in names:
         try:
             ensure_project(name, token)
             print(name + ": project accessible")
@@ -123,7 +133,8 @@ def main():
     values = None
     if phase == "prepare":
         values = seal_for_repositories(token, json.loads(os.environ["REPOSITORY_PUBLIC_KEYS"]))
-    audit_projects(token)
+    names = selected_projects()
+    audit_projects(token, names)
     if phase == "audit":
         print("Read-only project audit complete; no configuration or credentials changed")
     elif phase == "prepare":
@@ -133,7 +144,7 @@ def main():
         code, gates = sonar("qualitygates/list", token, {"organization": ORGANIZATION})
         require_success(code, "quality gate lookup")
         gate = next(g for g in gates["qualitygates"] if g["name"] == "Sonar way")
-        for name in REPOS:
+        for name in names:
             activate_project(name, token, gate)
 
 
