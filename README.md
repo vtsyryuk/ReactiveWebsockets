@@ -59,15 +59,7 @@ Gradle is configured to use a Java 25 toolchain. If Java 25 is not available loc
 
 ## SonarCloud
 
-SonarCloud analysis runs from the `SonarCloud Analysis` workflow on pushes, pull requests, and manual dispatch. The workflow builds the Java test and JaCoCo XML reports before invoking the Sonar Gradle scanner.
-
-Required GitHub Actions configuration:
-
-- secret `SONAR_TOKEN`: generated from SonarCloud
-- variable `SONAR_ORGANIZATION`: the SonarCloud organization key
-- variable `SONAR_PROJECT_KEY`: `vtsyryuk_ReactiveWebsockets`
-
-The workflow reports coverage from `build/reports/jacoco/test/jacocoTestReport.xml`. The demo HTTP service is excluded from Sonar coverage to match the JaCoCo verification scope for the reusable library. Until the secret and both variables exist, the workflow builds the reports and exits successfully with a notice instead of failing the PR.
+Analysis, activation, coverage, and quality-gate behavior are documented in [the shared SonarCloud setup guide](.github/SONARCLOUD.md).
 
 ## Publish
 

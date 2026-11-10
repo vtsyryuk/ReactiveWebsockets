@@ -2,59 +2,99 @@ name: SonarCloud Analysis
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
   workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
 
-jobs:
-  analysis:
-    name: Analyze
-    runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
-      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+concurrency:
+  group: sonarcloud-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
+env:
+  SONAR_ENABLED: ${{ vars.SONAR_ENABLED }}
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'vtsyryuk' }}
+  SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'vtsyryuk_ReactiveWebsockets' }}
+
+jobs:
+  verify:
+    name: SonarCloud build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout
+      - name: Checkout full history
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Set up JDK 25
+          persist-credentials: false
+      - name: Set up scanner JDK
         uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
           java-version: '25'
-
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+        uses: gradle/actions/setup-gradle@v6.4.1
+      - name: Build, test, and generate JaCoCo coverage
+        run: |
+          ./gradlew clean build jacocoTestReport --no-daemon
+      - name: Upload scanner inputs
+        uses: actions/upload-artifact@v7
         with:
-          build-scan-publish: true
-          build-scan-terms-of-use-url: https://gradle.com/terms-of-service
-          build-scan-terms-of-use-agree: 'yes'
-
-      - name: Build test report
-        run: ./gradlew clean test jacocoTestReport --scan
-
-      - name: SonarCloud token notice
-        if: env.SONAR_TOKEN == ''
+          name: sonar-inputs
+          path: |
+            build/classes/
+            build/resources/
+            build/reports/
+            build/test-results/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Report analysis activation state
+        shell: bash
         run: |
-          echo "::notice title=SonarCloud scan skipped::Add repository secret SONAR_TOKEN from SonarCloud to enable analysis."
+          if [ "$SONAR_ENABLED" != 'true' ]; then
+            echo '### SonarCloud analysis is not activated' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Build/test verification ran. No SonarCloud analysis or quality gate ran. Complete .github/SONARCLOUD.md and set SONAR_ENABLED=true.' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: SonarCloud project notice
-        if: env.SONAR_TOKEN != '' && (env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '')
+  analysis:
+    name: SonarCloud analysis and quality gate
+    needs: verify
+    # Untrusted PRs still get build/test verification, without receiving a token.
+    if: vars.SONAR_ENABLED == 'true' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require analysis credentials
+        shell: bash
         run: |
-          echo "::notice title=SonarCloud scan skipped::Add repository variables SONAR_ORGANIZATION and SONAR_PROJECT_KEY after importing this repository in SonarCloud."
-
-      - name: Analyze with SonarCloud
-        if: env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-        run: ./gradlew sonar --scan
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo '::error::SonarCloud is enabled but SONAR_TOKEN is missing. Add the repository secret; see .github/SONARCLOUD.md.'
+            exit 1
+          fi
+      - name: Set up scanner JDK
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.1
+      - name: Download scanner inputs
+        uses: actions/download-artifact@v7
+        with:
+          name: sonar-inputs
+          path: build
+      - name: Analyze and enforce the quality gate
+        run: |
+          ./gradlew sonar --no-daemon -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300
