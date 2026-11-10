@@ -70,6 +70,13 @@ class BootstrapTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "identifier"):
             bootstrap.seal_for_repositories(TEST_TOKEN, public)
 
+    def test_subset_activation_cannot_target_other_repositories(self):
+        with patch.dict(os.environ, {"TARGET_PROJECTS": "rust-playground,CppPlayground"}):
+            self.assertEqual(bootstrap.selected_projects(), ["rust-playground", "CppPlayground"])
+        for targets in ["other", "CppPlayground,CppPlayground", ","]:
+            with patch.dict(os.environ, {"TARGET_PROJECTS": targets}), self.assertRaisesRegex(RuntimeError, "approved"):
+                bootstrap.selected_projects()
+
     def test_audit_is_read_only_and_exports_no_credentials(self):
         with patch.dict(os.environ, {"SONAR_TOKEN": TEST_TOKEN, "BOOTSTRAP_PHASE": "audit"}), patch.object(bootstrap, "ensure_project") as check, patch.object(bootstrap, "sonar") as api, patch.object(bootstrap, "seal_for_repositories") as seal, patch("sys.stdout", io.StringIO()):
             bootstrap.main()
@@ -92,7 +99,7 @@ class BootstrapTests(unittest.TestCase):
         values = {"recipient": {"encrypted_value": "test-ciphertext"}}
         with patch.dict(os.environ, {"SONAR_TOKEN": TEST_TOKEN, "BOOTSTRAP_PHASE": "prepare", "REPOSITORY_PUBLIC_KEYS": "{}"}), patch.object(bootstrap, "audit_projects") as audit, patch.object(bootstrap, "seal_for_repositories", return_value=values), patch.object(bootstrap.Path, "write_text") as write, patch("sys.stdout", io.StringIO()):
             bootstrap.main()
-        audit.assert_called_once_with(TEST_TOKEN)
+        audit.assert_called_once_with(TEST_TOKEN, list(bootstrap.REPOS))
         self.assertEqual(json.loads(write.call_args.args[0]), values)
         self.assertNotIn(TEST_TOKEN, write.call_args.args[0])
 
