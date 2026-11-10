@@ -1,0 +1,47 @@
+name: SonarCloud configuration bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Audit access, prepare encrypted credentials, or activate CI analysis
+        type: choice
+        options: [audit, prepare, activate]
+        required: true
+      public_keys:
+        description: GitHub public encryption keys for the ten approved recipient repositories
+        type: string
+        default: '{}'
+
+permissions: {}
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Install sealed-box encryption library
+        if: inputs.phase == 'prepare'
+        run: python -m pip install PyNaCl==1.6.2
+      - name: Configure approved SonarCloud projects
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          BOOTSTRAP_PHASE: ${{ inputs.phase }}
+          REPOSITORY_PUBLIC_KEYS: ${{ inputs.public_keys }}
+        run: python .github/scripts/bootstrap-sonar.py
+      - name: Export GitHub-encrypted values
+        if: inputs.phase == 'prepare'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonarcloud-encrypted-credentials
+          path: sonarcloud-encrypted-credentials.json
+          retention-days: 1
+          if-no-files-found: error
