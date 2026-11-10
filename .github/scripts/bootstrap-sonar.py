@@ -97,7 +97,30 @@ def audit_projects(token, names):
         raise RuntimeError("Project setup required: " + ", ".join(failures))
 
 
+def align_main_branch(name, token):
+    key = ORGANIZATION + "_" + name
+    code, body = sonar("project_branches/list", token, {"project": key})
+    require_success(code, "main branch lookup for " + name)
+    branches = body.get("branches", [])
+    main = next((branch for branch in branches if branch.get("isMain")), None)
+    if main is None:
+        raise RuntimeError("No SonarCloud main branch found for " + name)
+    expected = REPOS[name]
+    if main.get("name") == expected:
+        return
+    if any(branch.get("name") == expected for branch in branches):
+        raise RuntimeError("Main branch alignment conflicts with an existing branch for " + name)
+    code, _ = sonar("project_branches/rename", token, {"project": key, "name": expected}, post=True)
+    require_success(code, "main branch alignment for " + name)
+    code, body = sonar("project_branches/list", token, {"project": key})
+    require_success(code, "main branch verification for " + name)
+    if not any(branch.get("isMain") and branch.get("name") == expected for branch in body.get("branches", [])):
+        raise RuntimeError("Main branch alignment verification failed for " + name)
+    print(name + ": main branch aligned to " + expected)
+
+
 def activate_project(name, token, gate):
+    align_main_branch(name, token)
     key = ORGANIZATION + "_" + name
     # Automatic Analysis uses its own API, not the generic project settings API.
     code, _ = sonar("autoscan/activation", token, {

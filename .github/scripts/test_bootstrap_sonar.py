@@ -109,13 +109,29 @@ class BootstrapTests(unittest.TestCase):
             bootstrap.main()
         self.assertEqual(activate.call_count, 12)
 
+    def test_main_branch_alignment_preserves_existing_history(self):
+        existing = (200, {"branches": [{"name": "master", "isMain": True}]})
+        aligned = (200, {"branches": [{"name": "main", "isMain": True}]})
+        with patch.object(bootstrap, "sonar", side_effect=[existing, (204, {}), aligned]) as api, patch("sys.stdout", io.StringIO()):
+            bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
+        self.assertEqual(api.call_args_list[1].args[0], "project_branches/rename")
+        with patch.object(bootstrap, "sonar", return_value=(200, {"branches": []})), self.assertRaisesRegex(RuntimeError, "No SonarCloud"):
+            bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
+        conflicting = (200, {"branches": [{"name": "master", "isMain": True}, {"name": "main", "isMain": False}]})
+        with patch.object(bootstrap, "sonar", return_value=conflicting) as api, self.assertRaisesRegex(RuntimeError, "conflicts"):
+            bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
+        self.assertEqual(api.call_count, 1)
+        with patch.object(bootstrap, "sonar", side_effect=[existing, (204, {}), existing]), self.assertRaisesRegex(RuntimeError, "verification failed"):
+            bootstrap.align_main_branch("rust-playground", TEST_TOKEN)
+
     def test_activation_uses_dedicated_api_and_preserves_matching_gate(self):
-        replies = [(204, {}), (200, {"qualityGate": {"id": 9}})]
+        branch = (200, {"branches": [{"name": "master", "isMain": True}]})
+        replies = [branch, (204, {}), (200, {"qualityGate": {"id": 9}})]
         with patch.object(bootstrap, "sonar", side_effect=replies) as api, patch("sys.stdout", io.StringIO()):
             bootstrap.activate_project("example-python", TEST_TOKEN, {"id": 9})
-        self.assertEqual(api.call_count, 2)
-        self.assertEqual(api.call_args_list[0].args[0], "autoscan/activation")
-        self.assertEqual(api.call_args_list[0].args[2], {"projectKey": "vtsyryuk_example-python", "enable": "false"})
+        self.assertEqual(api.call_count, 3)
+        self.assertEqual(api.call_args_list[1].args[0], "autoscan/activation")
+        self.assertEqual(api.call_args_list[1].args[2], {"projectKey": "vtsyryuk_example-python", "enable": "false"})
         replies[-1] = (200, {"qualityGate": {"id": 2}})
         with patch.object(bootstrap, "sonar", side_effect=replies + [(204, {})]) as api, patch("sys.stdout", io.StringIO()):
             bootstrap.activate_project("example-python", TEST_TOKEN, {"id": 9})
