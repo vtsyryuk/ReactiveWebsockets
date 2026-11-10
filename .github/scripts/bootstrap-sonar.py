@@ -16,7 +16,6 @@ REPOS = {
     "rxjava-jdbc": "master", "FrameworkExtensions": "master",
 }
 ORGANIZATION = "vtsyryuk"
-AUTOSCAN_SETTING = "sonar.autoscan.enabled"
 
 
 def sonar(path, token, params, *, post=False):
@@ -100,17 +99,11 @@ def audit_projects(token, names):
 
 def activate_project(name, token, gate):
     key = ORGANIZATION + "_" + name
-    code, _ = sonar("settings/set", token, {
-        "component": key, "key": AUTOSCAN_SETTING, "value": "false",
+    # Automatic Analysis uses its own API, not the generic project settings API.
+    code, _ = sonar("autoscan/activation", token, {
+        "projectKey": key, "enable": "false",
     }, post=True)
     require_success(code, "CI analysis activation for " + name)
-    code, settings = sonar("settings/values", token, {
-        "component": key, "keys": AUTOSCAN_SETTING,
-    })
-    require_success(code, "analysis method verification for " + name)
-    if not any(s.get("key") == AUTOSCAN_SETTING and s.get("value") == "false"
-               for s in settings.get("settings", [])):
-        raise RuntimeError("Automatic Analysis remains enabled for " + name)
     code, current = sonar("qualitygates/get_by_project", token, {
         "organization": ORGANIZATION, "project": key,
     })
@@ -120,7 +113,7 @@ def activate_project(name, token, gate):
             "organization": ORGANIZATION, "projectKey": key, "gateId": gate["id"],
         }, post=True)
         require_success(code, "quality gate selection for " + name)
-    print(name + ": CI analysis selected with the Sonar way quality gate")
+    print(name + ": Automatic Analysis disabled; Sonar way selected; verify the Actions scan")
 
 
 def main():
