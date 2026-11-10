@@ -26,13 +26,24 @@ Last updated from `master` at 2026-11-10 09:44 UTC for commit `a433d22`.
 - Live demo: https://reactivewebsockets.onrender.com
 - Render blueprint: `render.yaml`
 - Cloud E2E workflow: https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/cloud-e2e.yml
-- Latest verified cloud run: https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/28637845856
+- Latest verified cloud run: https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/42855826892
 - SonarCloud summary: https://sonarcloud.io/project/overview?id=vtsyryuk_ReactiveWebsockets
+
+## Demo and Cloud E2E Status
+
+| Component | Status | Where to check |
+| --- | --- | --- |
+| Browser demo | Deployed on Render | [Open demo](https://reactivewebsockets.onrender.com) |
+| Cloud browser E2E | Verified against the deployed demo | [Verified run](https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/42855826892) |
+| SonarCloud | GitHub Actions analysis with coverage and an enforced quality gate | [Analysis workflow](https://github.com/vtsyryuk/ReactiveWebsockets/actions/workflows/sonarcloud.yml) |
+| Deployment configuration | Docker image and Render Blueprint included | [render.yaml](render.yaml) |
+
+The hosted test exercises subscriptions, routed replies and shared-topic cleanup in Chromium. A deployment is already configured; no additional cloud service is needed for this demo. For another deployment, pass its URL as the Cloud E2E workflow’s `base_url` input.
 
 ## Requirements
 
 - Java 25
-- Gradle Wrapper 9.6.1
+- Gradle Wrapper (version pinned in `gradle/wrapper/gradle-wrapper.properties`)
 - RxJava 3
 - JUnit 6 and Mockito 5 for tests
 
@@ -126,7 +137,7 @@ Render Free web services are suitable for demos and hobby projects, but they can
 
 The `Cloud E2E` workflow runs Playwright browser tests against the deployed Render demo. It can run after successful deployment status events, runs daily to keep the cloud demo and status badge fresh, and can also be run manually from GitHub Actions with an optional `base_url` override.
 
-The current Render demo URL was verified by the `Cloud E2E` workflow in run [#28637845856](https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/28637845856).
+The current Render demo URL was verified by the `Cloud E2E` workflow in run [#42855826892](https://github.com/vtsyryuk/ReactiveWebsockets/actions/runs/42855826892).
 
 Run the same tests locally against any deployed demo:
 
