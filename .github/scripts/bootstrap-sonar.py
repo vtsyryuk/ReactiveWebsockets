@@ -97,6 +97,17 @@ def audit_projects(token, names):
         raise RuntimeError("Project setup required: " + ", ".join(failures))
 
 
+def remove_authorized_rust_conflict(name, token, current_main):
+    if (name != "rust-playground" or current_main != "master"
+            or os.environ.get("REMOVE_RUST_CONFLICT") != "true"):
+        raise RuntimeError("Main branch alignment conflicts with an existing branch for " + name)
+    code, _ = sonar("project_branches/delete", token, {
+        "project": "vtsyryuk_rust-playground", "branch": "main",
+    }, post=True)
+    require_success(code, "authorized Rust conflicting scan history removal")
+    print("rust-playground: removed the authorized conflicting non-primary main scan history")
+
+
 def align_main_branch(name, token):
     key = ORGANIZATION + "_" + name
     code, body = sonar("project_branches/list", token, {"project": key})
@@ -109,7 +120,7 @@ def align_main_branch(name, token):
     if main.get("name") == expected:
         return
     if any(branch.get("name") == expected for branch in branches):
-        raise RuntimeError("Main branch alignment conflicts with an existing branch for " + name)
+        remove_authorized_rust_conflict(name, token, main.get("name"))
     code, _ = sonar("project_branches/rename", token, {"project": key, "name": expected}, post=True)
     require_success(code, "main branch alignment for " + name)
     code, body = sonar("project_branches/list", token, {"project": key})
