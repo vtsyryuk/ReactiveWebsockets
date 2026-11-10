@@ -16,6 +16,7 @@ REPOS = {
     "rxjava-jdbc": "master", "FrameworkExtensions": "master",
 }
 ORGANIZATION = "vtsyryuk"
+AUTOSCAN_SETTING = "sonar.autoscan.enabled"
 
 
 def sonar(path, token, params, *, post=False):
@@ -74,17 +75,7 @@ def seal_for_repositories(token, public_keys):
     return result
 
 
-def main():
-    token = os.environ["SONAR_TOKEN"]
-    phase = os.environ["BOOTSTRAP_PHASE"]
-    if phase not in ("audit", "prepare", "activate"):
-        raise RuntimeError("Invalid bootstrap phase")
-    if not token:
-        raise RuntimeError("SONAR_TOKEN is missing")
-    values = None
-    if phase == "prepare":
-        # Validate the exact recipient list before any project is created.
-        values = seal_for_repositories(token, json.loads(os.environ["REPOSITORY_PUBLIC_KEYS"]))
+def audit_projects(token):
     failures = []
     for name in REPOS:
         try:
@@ -95,41 +86,55 @@ def main():
             print(str(error))
     if failures:
         raise RuntimeError("Project setup required: " + ", ".join(failures))
+
+
+def activate_project(name, token, gate):
+    key = ORGANIZATION + "_" + name
+    code, _ = sonar("settings/set", token, {
+        "component": key, "key": AUTOSCAN_SETTING, "value": "false",
+    }, post=True)
+    require_success(code, "CI analysis activation for " + name)
+    code, settings = sonar("settings/values", token, {
+        "component": key, "keys": AUTOSCAN_SETTING,
+    })
+    require_success(code, "analysis method verification for " + name)
+    if not any(s.get("key") == AUTOSCAN_SETTING and s.get("value") == "false"
+               for s in settings.get("settings", [])):
+        raise RuntimeError("Automatic Analysis remains enabled for " + name)
+    code, current = sonar("qualitygates/get_by_project", token, {
+        "organization": ORGANIZATION, "project": key,
+    })
+    require_success(code, "quality gate verification for " + name)
+    if str(current.get("qualityGate", {}).get("id")) != str(gate["id"]):
+        code, _ = sonar("qualitygates/select", token, {
+            "organization": ORGANIZATION, "projectKey": key, "gateId": gate["id"],
+        }, post=True)
+        require_success(code, "quality gate selection for " + name)
+    print(name + ": CI analysis selected with the Sonar way quality gate")
+
+
+def main():
+    token = os.environ["SONAR_TOKEN"]
+    phase = os.environ["BOOTSTRAP_PHASE"]
+    if phase not in ("audit", "prepare", "activate"):
+        raise RuntimeError("Invalid bootstrap phase")
+    if not token:
+        raise RuntimeError("SONAR_TOKEN is missing")
+    values = None
+    if phase == "prepare":
+        values = seal_for_repositories(token, json.loads(os.environ["REPOSITORY_PUBLIC_KEYS"]))
+    audit_projects(token)
     if phase == "audit":
         print("Read-only project audit complete; no configuration or credentials changed")
-        return
-    if phase == "prepare":
-        # Only GitHub can decrypt these sealed values with the destination's private key.
+    elif phase == "prepare":
         Path("sonarcloud-encrypted-credentials.json").write_text(json.dumps(values))
         print("Prepared ten GitHub-encrypted secret values; no plaintext credential was exported")
     else:
-        # The caller must first finish GitHub secret/variable installation in all repositories.
         code, gates = sonar("qualitygates/list", token, {"organization": ORGANIZATION})
         require_success(code, "quality gate lookup")
         gate = next(g for g in gates["qualitygates"] if g["name"] == "Sonar way")
         for name in REPOS:
-            key = ORGANIZATION + "_" + name
-            code, _ = sonar("settings/set", token, {
-                "component": key, "key": "sonar.autoscan.enabled", "value": "false",
-            }, post=True)
-            require_success(code, "CI analysis activation for " + name)
-            code, settings = sonar("settings/values", token, {
-                "component": key, "keys": "sonar.autoscan.enabled",
-            })
-            require_success(code, "analysis method verification for " + name)
-            if not any(s.get("key") == "sonar.autoscan.enabled" and s.get("value") == "false"
-                       for s in settings.get("settings", [])):
-                raise RuntimeError("Automatic Analysis remains enabled for " + name)
-            code, current = sonar("qualitygates/get_by_project", token, {
-                "organization": ORGANIZATION, "project": key,
-            })
-            require_success(code, "quality gate verification for " + name)
-            if str(current.get("qualityGate", {}).get("id")) != str(gate["id"]):
-                code, _ = sonar("qualitygates/select", token, {
-                    "organization": ORGANIZATION, "projectKey": key, "gateId": gate["id"],
-                }, post=True)
-                require_success(code, "quality gate selection for " + name)
-            print(name + ": CI analysis selected with the Sonar way quality gate")
+            activate_project(name, token, gate)
 
 
 if __name__ == "__main__":

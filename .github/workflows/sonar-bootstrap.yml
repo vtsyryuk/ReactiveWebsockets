@@ -30,7 +30,8 @@ jobs:
           python-version: '3.11'
       - name: Install sealed-box encryption library
         if: inputs.phase == 'prepare'
-        run: python -m pip install PyNaCl==1.6.2
+        run: |
+          python -m pip install --only-binary :all: PyNaCl==1.6.2
       - name: Configure approved SonarCloud projects
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
