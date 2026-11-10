@@ -109,16 +109,18 @@ class BootstrapTests(unittest.TestCase):
             bootstrap.main()
         self.assertEqual(activate.call_count, 12)
 
-    def test_activation_reads_back_analysis_method_and_preserves_matching_gate(self):
-        replies = [(204, {}), (200, {"settings": [{"key": bootstrap.AUTOSCAN_SETTING, "value": "false"}]}), (200, {"qualityGate": {"id": 9}})]
+    def test_activation_uses_dedicated_api_and_preserves_matching_gate(self):
+        replies = [(204, {}), (200, {"qualityGate": {"id": 9}})]
         with patch.object(bootstrap, "sonar", side_effect=replies) as api, patch("sys.stdout", io.StringIO()):
             bootstrap.activate_project("example-python", TEST_TOKEN, {"id": 9})
-        self.assertEqual(api.call_count, 3)
+        self.assertEqual(api.call_count, 2)
+        self.assertEqual(api.call_args_list[0].args[0], "autoscan/activation")
+        self.assertEqual(api.call_args_list[0].args[2], {"projectKey": "vtsyryuk_example-python", "enable": "false"})
         replies[-1] = (200, {"qualityGate": {"id": 2}})
         with patch.object(bootstrap, "sonar", side_effect=replies + [(204, {})]) as api, patch("sys.stdout", io.StringIO()):
             bootstrap.activate_project("example-python", TEST_TOKEN, {"id": 9})
         self.assertEqual(api.call_args.args[0], "qualitygates/select")
-        with patch.object(bootstrap, "sonar", side_effect=[(204, {}), (200, {"settings": []})]), self.assertRaisesRegex(RuntimeError, "remains enabled"):
+        with patch.object(bootstrap, "sonar", return_value=(403, {})) as api, self.assertRaisesRegex(RuntimeError, "HTTP 403"):
             bootstrap.activate_project("example-python", TEST_TOKEN, {"id": 9})
 
 
