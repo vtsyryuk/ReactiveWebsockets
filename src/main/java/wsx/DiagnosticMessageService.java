@@ -1,6 +1,6 @@
 package wsx;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.subjects.PublishSubject;
@@ -9,7 +9,7 @@ import io.reactivex.rxjava3.subjects.Subject;
 /**
  * In-memory diagnostic message bus backed by a serialized RxJava subject.
  */
-@Component
+@Service
 public final class DiagnosticMessageService implements MessageConsumer<DiagnosticMessage>, MessageProducer<DiagnosticMessage> {
 
     private final Subject<DiagnosticMessage> subject = PublishSubject.<DiagnosticMessage>create().toSerialized();
