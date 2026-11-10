@@ -147,6 +147,11 @@ jobs:
       - name: Commit README status update
         if: github.event_name == 'push'
         run: |
+          git fetch origin "$GITHUB_REF_NAME"
+          if [ "$(git rev-parse FETCH_HEAD)" != "$GITHUB_SHA" ]; then
+            echo "Skipping README status for a superseded commit."
+            exit 0
+          fi
           if git diff --quiet README.md; then
             echo "README status is already up to date."
             exit 0
@@ -155,7 +160,14 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md
           git commit -m "Update README CI status [skip ci]"
-          git push
+          if ! git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"; then
+            git fetch origin "$GITHUB_REF_NAME"
+            if [ "$(git rev-parse FETCH_HEAD)" != "$GITHUB_SHA" ]; then
+              echo "Skipping README status because the branch advanced during the update."
+              exit 0
+            fi
+            exit 1
+          fi
 
       - name: Fail if Gradle build failed
         if: steps.gradle-build.outcome != 'success'
