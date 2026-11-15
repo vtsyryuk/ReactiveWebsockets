@@ -1,5 +1,5 @@
 [versions]
-gson = "2.14.0"
+gson = "2.15.0"
 jacoco = "0.8.14"
 java = "25"
 junit-jupiter = "6.1.3"
