@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up scanner JDK
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '25'
@@ -42,7 +42,7 @@ jobs:
         run: |
           ./gradlew clean build jacocoTestReport --no-daemon
       - name: Set up Python for administrative workflow tests
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
       - name: Test administrative workflows and collect coverage
@@ -96,7 +96,7 @@ jobs:
             exit 1
           fi
       - name: Set up scanner JDK
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '25'
